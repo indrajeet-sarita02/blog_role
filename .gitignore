@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Database (regenerable via seeders)
+*.sqlite
+*.sqlite3
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
