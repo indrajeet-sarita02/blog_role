@@ -10,6 +10,7 @@ import { Alert } from '@/components/ui/Alert';
 import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 export default function AdminSettingsPage() {
   const { has } = usePermissions();
@@ -47,6 +48,10 @@ export default function AdminSettingsPage() {
     if (newKey.trim()) payload[newKey.trim()] = newValue;
     mutation.mutate(payload);
   };
+
+  if (!has('settings.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

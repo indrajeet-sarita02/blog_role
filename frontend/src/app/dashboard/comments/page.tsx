@@ -14,6 +14,7 @@ import { Alert } from '@/components/ui/Alert';
 import { extractErrorMessage } from '@/lib/api/client';
 import { formatDateTime } from '@/lib/utils/format';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 export default function CommentsModerationPage() {
   const { has } = usePermissions();
@@ -30,6 +31,7 @@ export default function CommentsModerationPage() {
         limit: '20',
         ...(status ? { status } : {}),
       }),
+    enabled: has('comment.view'),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['comments'] });
@@ -49,6 +51,10 @@ export default function CommentsModerationPage() {
     onSuccess: () => invalidate(),
     onError: (err) => setError(extractErrorMessage(err)),
   });
+
+  if (!has('comment.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

@@ -1,6 +1,4 @@
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth/AuthProvider';
-import { useRouter } from 'next/navigation';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

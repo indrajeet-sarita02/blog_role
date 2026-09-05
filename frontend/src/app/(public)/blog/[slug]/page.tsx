@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -12,8 +11,6 @@ import { Alert } from '@/components/ui/Alert';
 import { formatDate } from '@/lib/utils/format';
 
 export default function PostDetailPage({ params }: { params: { slug: string } }) {
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   const post = useQuery({
     queryKey: ['public-post', params.slug],
     queryFn: () => fetchPublicPost(params.slug),
@@ -27,15 +24,9 @@ export default function PostDetailPage({ params }: { params: { slug: string } })
     if (status === 404) {
       notFound();
     }
-    if (!errorMsg) {
-      setErrorMsg('This post is not available.');
-    }
-  }
-
-  if (errorMsg) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16">
-        <Alert type="error">{errorMsg}</Alert>
+        <Alert type="error">This post is not available.</Alert>
         <div className="mt-4">
           <Link href="/blog" className="text-sm text-blue-600 hover:underline">
             ← Back to blog

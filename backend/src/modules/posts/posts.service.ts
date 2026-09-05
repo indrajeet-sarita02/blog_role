@@ -5,6 +5,7 @@ import { parsePagination } from '@utils/pagination';
 import { POST_STATUS, POST_VISIBILITY } from '@config/constants';
 import { resolveUserPermissions } from '@utils/permissions';
 import { writeAuditLog } from '@utils/audit';
+import { sanitizeContent } from '@utils/sanitize';
 import { Op, WhereOptions } from 'sequelize';
 
 interface PostFilters {
@@ -176,7 +177,7 @@ export async function createPost(data: PostData & { status?: string }, actorId: 
         title: data.title!,
         slug,
         excerpt: data.excerpt ?? null,
-        content: data.content ?? null,
+        content: data.content ? sanitizeContent(data.content) : null,
         featuredImage: data.featuredImage ?? null,
         categoryId: data.categoryId ?? null,
         status,
@@ -235,7 +236,7 @@ export async function updatePost(id: number, data: PostData, actorId: string) {
 
   if (data.title) post.title = data.title;
   if (data.excerpt !== undefined) post.excerpt = data.excerpt;
-  if (data.content !== undefined) post.content = data.content;
+  if (data.content !== undefined) post.content = data.content ? sanitizeContent(data.content) : data.content;
   if (data.featuredImage !== undefined) post.featuredImage = data.featuredImage;
   if (data.visibility) post.visibility = data.visibility;
 

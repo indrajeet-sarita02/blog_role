@@ -2,12 +2,20 @@ import { Post, Category, Tag } from '@database/index';
 import { AppError } from '@utils/AppError';
 import { parsePagination } from '@utils/pagination';
 import { POST_STATUS, POST_VISIBILITY } from '@config/constants';
+import { sanitizeContent } from '@utils/sanitize';
 import { Op, WhereOptions } from 'sequelize';
 
 const PUBLIC_WHERE = {
   status: POST_STATUS.PUBLISHED,
   visibility: POST_VISIBILITY.PUBLIC,
 };
+
+function toPublicPost(post: Post) {
+  if (post.content) {
+    post.content = sanitizeContent(post.content);
+  }
+  return post;
+}
 
 const POST_INCLUDE = [
   { model: Tag, as: 'tags', through: { attributes: [] }, attributes: ['id', 'name', 'slug'] },
@@ -58,7 +66,7 @@ export async function listPublicPosts(filters: {
   });
 
   return {
-    posts: rows,
+    posts: rows.map(toPublicPost),
     meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
   };
 }
@@ -71,7 +79,7 @@ export async function getPublicPostBySlug(slug: string) {
   if (!post) {
     throw AppError.notFound('Post not found');
   }
-  return post;
+  return toPublicPost(post);
 }
 
 export async function listPublicCategories(filters: { page?: string; limit?: string; search?: string; sort?: string; order?: 'asc' | 'desc' }) {
@@ -156,7 +164,7 @@ export async function searchPublic(query: string, filters: { page?: string; limi
   });
 
   return {
-    posts: rows,
+    posts: rows.map(toPublicPost),
     meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
   };
 }

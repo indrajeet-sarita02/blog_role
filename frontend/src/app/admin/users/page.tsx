@@ -15,6 +15,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { formatDate } from '@/lib/utils/format';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 import { User } from '@/types';
 
 export default function AdminUsersPage() {
@@ -45,7 +46,11 @@ export default function AdminUsersPage() {
       }),
     enabled: has('user.view'),
   });
-  const roles = useQuery({ queryKey: ['roles-options'], queryFn: () => fetchRoles({ limit: '100' }) });
+  const roles = useQuery({
+    queryKey: ['roles-options'],
+    queryFn: () => fetchRoles({ limit: '100' }),
+    enabled: has('role.view'),
+  });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['users'] });
 
@@ -89,6 +94,10 @@ export default function AdminUsersPage() {
   const toggleAuthor = (id: number) => {
     setNewRoleIds((prev) => (prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]));
   };
+
+  if (!has('user.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

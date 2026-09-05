@@ -11,6 +11,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { PageLoader } from '@/components/ui/Spinner';
 import { formatDate } from '@/lib/utils/format';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 const MODULES = [
   'auth',
@@ -48,6 +49,10 @@ export default function AdminAuditLogsPage() {
 
   const renderValue = (value: unknown) =>
     value === null || value === undefined ? '—' : JSON.stringify(value, null, 2);
+
+  if (!has('audit.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

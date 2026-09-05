@@ -24,6 +24,7 @@ export default function DashboardOverview() {
   const comments = useQuery({
     queryKey: ['admin-comments', { page: '1', limit: '5' }],
     queryFn: () => fetchComments({ page: '1', limit: '5' }),
+    enabled: has('comment.view'),
   });
   const media = useQuery({
     queryKey: ['media', { page: '1', limit: '1' }],
@@ -33,8 +34,12 @@ export default function DashboardOverview() {
 
   const stats = [
     { label: 'My Posts', value: myPosts.data?.meta.total ?? '—', href: '/dashboard/posts' },
-    { label: 'Recent Comments', value: comments.data?.meta.total ?? '—', href: '/dashboard/comments' },
-    { label: 'Media Files', value: media.data?.meta.total ?? '—', href: '/dashboard/media' },
+    ...(has('comment.view')
+      ? [{ label: 'Recent Comments', value: comments.data?.meta.total ?? '—', href: '/dashboard/comments' }]
+      : []),
+    ...(has('media.view')
+      ? [{ label: 'Media Files', value: media.data?.meta.total ?? '—', href: '/dashboard/media' }]
+      : []),
   ];
 
   return (
@@ -62,9 +67,11 @@ export default function DashboardOverview() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Recent Posts</CardTitle>
-          <Link href="/dashboard/posts/new" className="text-sm font-medium text-blue-600 hover:underline">
-            + New post
-          </Link>
+          {has('blog.create') && (
+            <Link href="/dashboard/posts/new" className="text-sm font-medium text-blue-600 hover:underline">
+              + New post
+            </Link>
+          )}
         </CardHeader>
         <CardBody>
           {myPosts.isLoading ? (
@@ -72,9 +79,11 @@ export default function DashboardOverview() {
           ) : myPosts.data?.data.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-500">
               You haven&apos;t written any posts yet.{' '}
-              <Link href="/dashboard/posts/new" className="text-blue-600 hover:underline">
-                Write your first post
-              </Link>
+              {has('blog.create') && (
+                <Link href="/dashboard/posts/new" className="text-blue-600 hover:underline">
+                  Write your first post
+                </Link>
+              )}
             </p>
           ) : (
             <ul className="divide-y divide-gray-100">

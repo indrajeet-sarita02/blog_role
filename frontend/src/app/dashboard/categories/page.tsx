@@ -21,6 +21,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { slugify } from '@/lib/utils/format';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 import { Category } from '@/types';
 
 const emptyForm = { name: '', slug: '', description: '', parentId: '', status: 'active' };
@@ -112,6 +113,10 @@ export default function CategoriesPage() {
       .filter((c) => !editingId || c.id !== editingId)
       .map((c) => ({ value: String(c.id), label: c.name })),
   ];
+
+  if (!has('category.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

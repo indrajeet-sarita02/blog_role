@@ -12,6 +12,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { formatDateTime, formatFileSize } from '@/lib/utils/format';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 export default function MediaPage() {
   const { has } = usePermissions();
@@ -54,6 +55,10 @@ export default function MediaPage() {
   });
 
   const isImage = (mime: string) => mime.startsWith('image/');
+
+  if (!has('media.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>
@@ -148,25 +153,29 @@ export default function MediaPage() {
                       {formatFileSize(item.fileSize)} · {formatDateTime(item.createdAt)}
                     </p>
                     <div className="flex gap-2 pt-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const alt = window.prompt('Alt text', item.altText ?? '');
-                          if (alt !== null) altMutation.mutate({ id: item.id, alt });
-                        }}
-                      >
-                        Alt
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm(`Delete "${item.originalName}"?`)) deleteMutation.mutate(item.id);
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      {has('media.upload') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const alt = window.prompt('Alt text', item.altText ?? '');
+                            if (alt !== null) altMutation.mutate({ id: item.id, alt });
+                          }}
+                        >
+                          Alt
+                        </Button>
+                      )}
+                      {has('media.delete') && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`Delete "${item.originalName}"?`)) deleteMutation.mutate(item.id);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

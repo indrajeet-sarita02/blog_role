@@ -21,6 +21,17 @@ export default function TagPage({ params }: { params: { slug: string } }) {
     retry: false,
   });
 
+  if (tag.isError) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-16">
+        <Alert type="error">
+          <p className="font-semibold text-gray-900">Tag not found</p>
+          <p className="mt-1">The tag &ldquo;{params.slug}&rdquo; doesn&apos;t exist or has no public listing.</p>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-8">

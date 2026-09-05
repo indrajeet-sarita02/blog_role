@@ -15,6 +15,7 @@ import { fetchCategoryList } from '@/lib/api/categories';
 import { fetchTags } from '@/lib/api/tags';
 import { slugify } from '@/lib/utils/format';
 import { PostPayload } from '@/lib/api/posts';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Post } from '@/types';
 
 export interface PostFormValues {
@@ -40,8 +41,17 @@ interface PostFormProps {
 
 export function PostForm({ mode, initial, isSubmitting = false, error, onCancel, onSubmit }: PostFormProps) {
   const { user } = useAuth();
-  const categories = useQuery({ queryKey: ['admin-categories'], queryFn: () => fetchCategoryList({ limit: '100' }) });
-  const tags = useQuery({ queryKey: ['admin-tags'], queryFn: () => fetchTags({ limit: '100' }) });
+  const { has } = usePermissions();
+  const categories = useQuery({
+    queryKey: ['admin-categories'],
+    queryFn: () => fetchCategoryList({ limit: '100' }),
+    enabled: has('category.view'),
+  });
+  const tags = useQuery({
+    queryKey: ['admin-tags'],
+    queryFn: () => fetchTags({ limit: '100' }),
+    enabled: has('tag.view'),
+  });
 
   const [categoryId, setCategoryId] = useState<number | null>(initial?.categoryId ?? null);
   const [tagIds, setTagIds] = useState<number[]>(initial?.tags?.map((t) => t.id) ?? []);

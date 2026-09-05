@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { PageLoader } from '@/components/ui/Spinner';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 export default function AdminPermissionsPage() {
   const { has } = usePermissions();
@@ -16,6 +17,10 @@ export default function AdminPermissionsPage() {
   });
 
   const modules = Array.from(new Set(permissions.data?.data.map((p) => p.module) ?? []));
+
+  if (!has('permission.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

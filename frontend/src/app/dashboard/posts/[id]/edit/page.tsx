@@ -24,11 +24,13 @@ import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { formatDateTime } from '@/lib/utils/format';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 export default function EditPostPage({ params }: { params: { id: string } }) {
   const postId = Number(params.id);
   const queryClient = useQueryClient();
   const { has, hasAny } = usePermissions();
+  const canManage = hasAny('blog.update', 'blog.updateAny');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -41,7 +43,7 @@ export default function EditPostPage({ params }: { params: { id: string } }) {
   const revisions = useQuery({
     queryKey: ['revisions', postId],
     queryFn: () => fetchPostRevisions(postId),
-    enabled: Number.isInteger(postId),
+    enabled: Number.isInteger(postId) && canManage,
   });
 
   const invalidate = () => {
@@ -78,7 +80,7 @@ export default function EditPostPage({ params }: { params: { id: string } }) {
       onError: (err) => setError(extractErrorMessage(err)),
     }),
     reject: useMutation({
-      mutationFn: () => rejectPost(postId, ''),
+      mutationFn: (reason: string) => rejectPost(postId, reason),
       onSuccess: () => {
         setSuccess('Post rejected.');
         invalidate();
@@ -111,6 +113,10 @@ export default function EditPostPage({ params }: { params: { id: string } }) {
     },
     onError: (err) => setError(extractErrorMessage(err)),
   });
+
+  if (!canManage) {
+    return <AccessDenied />;
+  }
 
   if (post.isLoading) return <PageLoader />;
   if (post.isError) {
@@ -172,7 +178,15 @@ export default function EditPostPage({ params }: { params: { id: string } }) {
           </Button>
         )}
         {data?.status === 'pending_review' && has('blog.reject') && (
-          <Button size="sm" variant="danger" onClick={() => workflowMutations.reject.mutate()} loading={workflowMutations.reject.isLoading}>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => {
+              const reason = window.prompt('Reason for rejection');
+              if (reason !== null) workflowMutations.reject.mutate(reason);
+            }}
+            loading={workflowMutations.reject.isLoading}
+          >
             Reject
           </Button>
         )}
@@ -234,6 +248,7 @@ export default function EditPostPage({ params }: { params: { id: string } }) {
                         restoreMutation.mutate(revision.id);
                       }
                     }}
+                    disabled={!canManage}
                     loading={restoreMutation.isLoading}
                   >
                     Restore

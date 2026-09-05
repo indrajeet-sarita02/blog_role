@@ -9,10 +9,13 @@ import { PostForm } from '@/components/forms/PostForm';
 import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { extractErrorMessage } from '@/lib/api/client';
+import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 export default function NewPostPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { has } = usePermissions();
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -24,6 +27,10 @@ export default function NewPostPage() {
     },
     onError: (err) => setError(extractErrorMessage(err)),
   });
+
+  if (!has('blog.create')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

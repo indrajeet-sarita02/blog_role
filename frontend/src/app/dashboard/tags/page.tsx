@@ -12,6 +12,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 import { Tag } from '@/types';
 
 export default function TagsPage() {
@@ -57,6 +58,10 @@ export default function TagsPage() {
     onSuccess: () => invalidate(),
     onError: (err) => setError(extractErrorMessage(err)),
   });
+
+  if (!has('tag.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>

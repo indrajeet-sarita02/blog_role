@@ -22,6 +22,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { formatDate } from '@/lib/utils/format';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 
 export default function PostsAdminPage() {
   const { has } = usePermissions();
@@ -37,9 +38,10 @@ export default function PostsAdminPage() {
       fetchPosts({
         page: String(page),
         limit: '20',
-        status,
+        ...(status ? { status } : {}),
         ...(search ? { search } : {}),
       }),
+    enabled: has('blog.view'),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['posts'] });
@@ -60,7 +62,7 @@ export default function PostsAdminPage() {
     onError: (err) => setError(extractErrorMessage(err)),
   });
   const rejectMutation = useMutation({
-    mutationFn: (id: number) => rejectPost(id, ''),
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => rejectPost(id, reason),
     onSuccess: () => invalidate(),
     onError: (err) => setError(extractErrorMessage(err)),
   });
@@ -76,6 +78,10 @@ export default function PostsAdminPage() {
   });
 
   const canManage = has('blog.update') || has('blog.updateAny');
+
+  if (!has('blog.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>
@@ -199,8 +205,11 @@ export default function PostsAdminPage() {
                             <Button
                               variant="danger"
                               size="sm"
-                              onClick={() => rejectMutation.mutate(post.id)}
-                              loading={rejectMutation.isLoading && rejectMutation.variables === post.id}
+                              onClick={() => {
+                                const reason = window.prompt('Reason for rejection');
+                                if (reason !== null) rejectMutation.mutate({ id: post.id, reason });
+                              }}
+                              loading={rejectMutation.isLoading && rejectMutation.variables?.id === post.id}
                             >
                               Reject
                             </Button>

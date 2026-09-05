@@ -20,6 +20,7 @@ import { Alert } from '@/components/ui/Alert';
 import { PageLoader } from '@/components/ui/Spinner';
 import { extractErrorMessage } from '@/lib/api/client';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AccessDenied } from '@/components/guards/AccessDenied';
 import { Role } from '@/types';
 
 export default function AdminRolesPage() {
@@ -105,6 +106,10 @@ export default function AdminRolesPage() {
   }, [rolePerms.data, permRole]);
 
   const modules = Array.from(new Set(permissions.data?.data.map((p) => p.module) ?? []));
+
+  if (!has('role.view')) {
+    return <AccessDenied />;
+  }
 
   return (
     <div>
