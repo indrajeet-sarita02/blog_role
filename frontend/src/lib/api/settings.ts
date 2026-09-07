@@ -1,16 +1,17 @@
-import { api } from './client';
-import { ApiResponse } from '@/types';
+import { getStore, saveStore, delay } from '@/lib/mock/store';
 
-export interface Settings {
-  [key: string]: string;
-}
+export type Settings = Record<string, string>;
 
-export async function fetchSettings(params?: Record<string, string>) {
-  const { data } = await api.get<ApiResponse<Settings>>('/settings', { params });
-  return data.data;
+export async function fetchSettings(_params?: Record<string, string>) {
+  await delay();
+  const store = getStore();
+  return { ...store.settings } as Settings;
 }
 
 export async function updateSettings(updates: Record<string, string>) {
-  const { data } = await api.put<ApiResponse<Settings>>('/settings', updates);
-  return data.data;
+  await delay();
+  const store = getStore();
+  Object.assign(store.settings, updates);
+  saveStore(store);
+  return { ...store.settings } as Settings;
 }
