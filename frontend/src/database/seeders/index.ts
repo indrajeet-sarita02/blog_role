@@ -33,12 +33,21 @@ Notification.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 Category.belongsTo(Category, { as: 'parent', foreignKey: 'parentId' });
 Category.hasMany(Category, { as: 'children', foreignKey: 'parentId' });
 
-let _dbReady = false;
+const sg = globalThis as unknown as { __blogDbReady?: boolean };
 
 export async function ensureDb() {
-  if (!_dbReady) {
-    await initDatabase();
-    _dbReady = true;
+  if (sg.__blogDbReady) return;
+  sg.__blogDbReady = true;
+  await initDatabase();
+  await ensureSeeded();
+}
+
+async function ensureSeeded() {
+  try {
+    const { seedDatabase } = await import('./seed');
+    await seedDatabase();
+  } catch (e) {
+    console.error('Seeding failed', e);
   }
 }
 

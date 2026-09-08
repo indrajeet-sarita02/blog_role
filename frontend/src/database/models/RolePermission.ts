@@ -2,7 +2,6 @@ import { DataTypes, Model } from 'sequelize';
 import { sequelize } from '@/database';
 
 class RolePermission extends Model {
-  declare id: number;
   declare roleId: number;
   declare permissionId: number;
   declare createdAt: Date;
@@ -10,16 +9,10 @@ class RolePermission extends Model {
 
 RolePermission.init(
   {
-    id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
-    roleId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
-    permissionId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+    roleId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, primaryKey: true },
+    permissionId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, primaryKey: true },
   },
-  {
-    sequelize,
-    tableName: 'role_permissions',
-    updatedAt: false,
-    indexes: [{ unique: true, fields: ['role_id', 'permission_id'] }],
-  },
+  { sequelize, tableName: 'role_permissions', updatedAt: false },
 );
 
 export default RolePermission;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureDb, User, Role, UserRole } from '@/database/seeders';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [{ model: Role, as: 'roles' }];
 

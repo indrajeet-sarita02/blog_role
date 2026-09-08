@@ -1,105 +1,48 @@
-import { getStore, saveStore, delay, nextId } from '@/lib/mock/store';
-import { ApiListResponse, ApiResponse, Comment } from '@/types';
+import { apiRequest } from '@/lib/api/client';
+import { ApiListResponse, Comment } from '@/types';
+
+type ApiBody<T> = { success: boolean; message: string; data: T; meta?: unknown };
 
 export async function fetchComments(params?: Record<string, string>) {
-  await delay();
-  const store = getStore();
-  let comments = [...store.comments];
-
-  if (params?.postId) comments = comments.filter((c) => c.postId === parseInt(params.postId));
-  if (params?.status) comments = comments.filter((c) => c.status === params.status);
-
-  const page = parseInt(params?.page || '1');
-  const limit = parseInt(params?.limit || '20');
-  const total = comments.length;
-  const start = (page - 1) * limit;
-  const paged = comments.slice(start, start + limit);
-
-  return {
-    success: true,
-    message: 'Comments fetched',
-    data: paged,
-    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  } as ApiListResponse<Comment>;
+  const qs = new URLSearchParams(params || {}).toString();
+  const res = await apiRequest<ApiBody<Comment[]>>(`/api/comments${qs ? `?${qs}` : ''}`);
+  return res as unknown as ApiListResponse<Comment>;
 }
 
 export async function fetchPostComments(postId: number) {
-  await delay();
-  const store = getStore();
-  const comments = store.comments.filter(
-    (c) => c.postId === postId && c.status === 'approved',
-  );
-
-  return {
-    success: true,
-    message: 'Comments fetched',
-    data: comments,
-    meta: { page: 1, limit: 100, total: comments.length, totalPages: 1 },
-  } as ApiListResponse<Comment>;
+  const res = await apiRequest<ApiBody<Comment[]>>(`/api/posts/${postId}/comments?status=approved&limit=100`);
+  return { success: true, message: 'Comments fetched', data: res.data, meta: { page: 1, limit: 100, total: res.data.length, totalPages: 1 } } as ApiListResponse<Comment>;
 }
 
 export async function createComment(
   postId: number,
   payload: { content: string; parentId?: number | null },
 ) {
-  await delay();
-  const store = getStore();
-  const raw = typeof window !== 'undefined' ? window.localStorage.getItem('blog_access_token') : null;
-  if (!raw) throw new Error('Not authenticated');
-  const tokenPayload = JSON.parse(atob(raw));
-  const user = store.users.find((u) => u.id === tokenPayload.userId);
-
-  const comment: Comment = {
-    id: nextId(store, 'comment'),
-    postId,
-    userId: tokenPayload.userId,
-    parentId: payload.parentId || null,
-    content: payload.content,
-    status: 'approved',
-    createdAt: new Date().toISOString(),
-    user: user
-      ? { id: user.id, name: user.name, email: user.email, avatar: null, bio: null, status: 'active' }
-      : undefined,
-  };
-
-  store.comments.push(comment);
-  saveStore(store);
-  return comment;
+  const res = await apiRequest<ApiBody<Comment>>(`/api/posts/${postId}/comments`, {
+    method: 'POST',
+    body: payload,
+  });
+  return res.data;
 }
 
 export async function updateComment(id: number, content: string) {
-  await delay();
-  const store = getStore();
-  const comment = store.comments.find((c) => c.id === id);
-  if (!comment) throw new Error('Comment not found');
-  comment.content = content;
-  saveStore(store);
-  return comment;
+  const res = await apiRequest<ApiBody<Comment>>(`/api/comments/${id}`, {
+    method: 'PUT',
+    body: { content },
+  });
+  return res.data;
 }
 
 export async function deleteComment(id: number) {
-  await delay();
-  const store = getStore();
-  store.comments = store.comments.filter((c) => c.id !== id);
-  saveStore(store);
+  await apiRequest(`/api/comments/${id}`, { method: 'DELETE' });
 }
 
 export async function approveComment(id: number) {
-  await delay();
-  const store = getStore();
-  const comment = store.comments.find((c) => c.id === id);
-  if (!comment) throw new Error('Comment not found');
-  comment.status = 'approved';
-  saveStore(store);
-  return comment;
+  const res = await apiRequest<ApiBody<Comment>>(`/api/comments/${id}/approve`, { method: 'POST' });
+  return res.data;
 }
 
 export async function rejectComment(id: number) {
-  await delay();
-  const store = getStore();
-  const comment = store.comments.find((c) => c.id === id);
-  if (!comment) throw new Error('Comment not found');
-  comment.status = 'rejected';
-  saveStore(store);
-  return comment;
+  const res = await apiRequest<ApiBody<Comment>>(`/api/comments/${id}/reject`, { method: 'POST' });
+  return res.data;
 }

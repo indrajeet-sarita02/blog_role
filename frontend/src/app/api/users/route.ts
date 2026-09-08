@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [{ model: Role, as: 'roles' }];
 
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
   }
 
   return sequelize.transaction(async (t) => {
-    const existing = await User.findOne({ where: { email } }, { transaction: t });
+    const existing = await User.findOne({ where: { email }, transaction: t });
     if (existing) {
       throw { status: 409, message: 'Email already in use' };
     }
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     let assignedRoleIds = roleIds;
     if (!assignedRoleIds || !assignedRoleIds.length) {
-      const userRole = await Role.findOne({ where: { slug: 'user' } }, { transaction: t });
+      const userRole = await Role.findOne({ where: { slug: 'user' }, transaction: t });
       assignedRoleIds = userRole ? [userRole.id] : [];
     }
     if (assignedRoleIds.length) {

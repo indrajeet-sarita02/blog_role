@@ -3,6 +3,7 @@ import { ensureDb, Role, Permission, RolePermission } from '@/database/seeders';
 import { slugify } from '@/lib/utils/slug';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [{ model: Permission, as: 'permissions' }];
 

@@ -3,12 +3,13 @@ import { ensureDb, Comment, User } from '@/database/seeders';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [{ model: User, as: 'user' }];
 
-export async function GET(req: NextRequest, { params }: { params: { postId: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
-  const postId = parseInt(params.postId);
+  const postId = parseInt(params.id);
   const page = parseInt(req.nextUrl.searchParams.get('page') || '1');
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '20'), 100);
   const { count, rows } = await Comment.findAndCountAll({
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { postId: stri
   });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { postId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
   const userId = getUserIdFromRequest(req);
   if (!userId) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { postId: str
     return NextResponse.json({ success: false, message: 'Content is required' }, { status: 400 });
   }
   const comment = await Comment.create({
-    postId: parseInt(params.postId), userId, parentId: parentId ?? null,
+    postId: parseInt(params.id), userId, parentId: parentId ?? null,
     content, status: 'approved',
   });
   const full = await Comment.findByPk(comment.id, { include });

@@ -1,5 +1,5 @@
-import { getStore, saveStore, delay, makeSlug, nextId } from '@/lib/mock/store';
-import { ApiListResponse, ApiResponse, Category } from '@/types';
+import { apiRequest } from '@/lib/api/client';
+import { ApiListResponse, Category } from '@/types';
 
 export interface CategoryPayload {
   name: string;
@@ -9,80 +9,35 @@ export interface CategoryPayload {
   status?: string;
 }
 
+type ApiBody<T> = { success: boolean; message: string; data: T; meta?: unknown };
+
 export async function fetchCategoryList(params?: Record<string, string>) {
-  await delay();
-  const store = getStore();
-  let categories = [...store.categories];
-
-  if (params?.search) {
-    const s = params.search.toLowerCase();
-    categories = categories.filter((c) => c.name.toLowerCase().includes(s));
-  }
-
-  const page = parseInt(params?.page || '1');
-  const limit = parseInt(params?.limit || '20');
-  const total = categories.length;
-  const start = (page - 1) * limit;
-  const paged = categories.slice(start, start + limit);
-
-  return {
-    success: true,
-    message: 'Categories fetched',
-    data: paged,
-    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  } as ApiListResponse<Category>;
+  const qs = new URLSearchParams(params || {}).toString();
+  const res = await apiRequest<ApiBody<Category[]>>(`/api/categories${qs ? `?${qs}` : ''}`);
+  return res as unknown as ApiListResponse<Category>;
 }
 
 export async function fetchCategory(id: number) {
-  await delay();
-  const store = getStore();
-  const cat = store.categories.find((c) => c.id === id);
-  if (!cat) throw new Error('Category not found');
-  return cat;
+  const res = await apiRequest<ApiBody<Category>>(`/api/categories/${id}`);
+  return res.data;
 }
 
 export async function createCategory(payload: CategoryPayload) {
-  await delay();
-  const store = getStore();
-  const slug = payload.slug || makeSlug(payload.name);
-
-  if (store.categories.find((c) => c.slug === slug)) {
-    throw new Error('Category with this slug already exists');
-  }
-
-  const cat: Category = {
-    id: nextId(store, 'category'),
-    name: payload.name,
-    slug,
-    description: payload.description || null,
-    status: payload.status || 'active',
-    parentId: payload.parentId || null,
-  };
-
-  store.categories.push(cat);
-  saveStore(store);
-  return cat;
+  const res = await apiRequest<ApiBody<Category>>('/api/categories', {
+    method: 'POST',
+    body: payload,
+  });
+  return res.data;
 }
 
 export async function updateCategory(id: number, payload: Partial<CategoryPayload>) {
-  await delay();
-  const store = getStore();
-  const cat = store.categories.find((c) => c.id === id);
-  if (!cat) throw new Error('Category not found');
-
-  if (payload.name !== undefined) cat.name = payload.name;
-  if (payload.slug !== undefined) cat.slug = payload.slug;
-  if (payload.description !== undefined) cat.description = payload.description;
-  if (payload.status !== undefined) cat.status = payload.status;
-  if (payload.parentId !== undefined) cat.parentId = payload.parentId;
-
-  saveStore(store);
-  return cat;
+  const res = await apiRequest<ApiBody<Category>>(`/api/categories/${id}`, {
+    method: 'PUT',
+    body: payload,
+  });
+  return res.data;
 }
 
 export async function deleteCategory(id: number) {
-  await delay();
-  const store = getStore();
-  store.categories = store.categories.filter((c) => c.id !== id);
-  saveStore(store);
+  await apiRequest(`/api/categories/${id}`, { method: 'DELETE' });
 }

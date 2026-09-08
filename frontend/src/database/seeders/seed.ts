@@ -1,4 +1,4 @@
-import { sequelize, initDatabase } from '@/database';
+import { initDatabase, sequelize } from '@/database';
 import User from '@/database/models/User';
 import Role from '@/database/models/Role';
 import Permission from '@/database/models/Permission';
@@ -139,142 +139,147 @@ export async function seedDatabase() {
   const count = await User.count();
   if (count > 0) return; // already seeded
 
-  // Permissions
-  const permRecords = await Permission.bulkCreate(
-    PERMISSIONS.map((p) => ({ name: p.name, slug: p.slug, module: p.module, description: null })),
-  );
-  const permBySlug = new Map(permRecords.map((p) => [p.slug, p.id]));
+  const t = await sequelize.transaction();
 
-  const roleDefs = [
-    { name: 'Super Admin', slug: 'super-admin', perms: PERMISSIONS.map((p) => p.slug), isSystem: true },
-    { name: 'Admin', slug: 'admin', perms: PERMISSIONS.filter((p) => !p.slug.startsWith('role.')).map((p) => p.slug), isSystem: true },
-    {
-      name: 'Editor', slug: 'editor', isSystem: true,
-      perms: ['blog.create', 'blog.view', 'blog.viewAny', 'blog.update', 'blog.updateAny', 'blog.delete', 'blog.deleteAny', 'blog.publish', 'blog.approve', 'blog.reject', 'blog.archive', 'comment.create', 'comment.view', 'comment.viewAny', 'comment.update', 'comment.updateAny', 'comment.delete', 'comment.deleteAny', 'comment.approve', 'comment.reject', 'category.create', 'category.view', 'category.update', 'category.delete', 'tag.create', 'tag.view', 'tag.update', 'tag.delete', 'media.upload', 'media.view', 'media.delete'],
-    },
-    {
-      name: 'Author', slug: 'author', isSystem: true,
-      perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'blog.publish', 'comment.create', 'comment.view', 'comment.update', 'comment.delete', 'media.upload', 'media.view'],
-    },
-    {
-      name: 'Contributor', slug: 'contributor', isSystem: true,
-      perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
-    },
-    {
-      name: 'User', slug: 'user', isSystem: true,
-      perms: ['blog.view', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
-    },
-  ];
+  try {
+    // Permissions
+    const permRecords = await Permission.bulkCreate(
+      PERMISSIONS.map((p) => ({ name: p.name, slug: p.slug, module: p.module, description: null })),
+      { transaction: t },
+    );
+    const permBySlug = new Map(permRecords.map((p) => [p.slug, p.id]));
 
-  const roles: Role[] = [];
-  for (const r of roleDefs) {
-    const role = await Role.create({ name: r.name, slug: r.slug, description: null, isSystem: r.isSystem });
-    roles.push(role);
-    if (r.perms.length) {
-      await RolePermission.bulkCreate(r.perms.map((s) => ({ roleId: role.id, permissionId: permBySlug.get(s)! })));
+    const roleDefs = [
+      { name: 'Super Admin', slug: 'super-admin', perms: PERMISSIONS.map((p) => p.slug), isSystem: true },
+      { name: 'Admin', slug: 'admin', perms: PERMISSIONS.filter((p) => !p.slug.startsWith('role.')).map((p) => p.slug), isSystem: true },
+      {
+        name: 'Editor', slug: 'editor', isSystem: true,
+        perms: ['blog.create', 'blog.view', 'blog.viewAny', 'blog.update', 'blog.updateAny', 'blog.delete', 'blog.deleteAny', 'blog.publish', 'blog.approve', 'blog.reject', 'blog.archive', 'comment.create', 'comment.view', 'comment.viewAny', 'comment.update', 'comment.updateAny', 'comment.delete', 'comment.deleteAny', 'comment.approve', 'comment.reject', 'category.create', 'category.view', 'category.update', 'category.delete', 'tag.create', 'tag.view', 'tag.update', 'tag.delete', 'media.upload', 'media.view', 'media.delete'],
+      },
+      {
+        name: 'Author', slug: 'author', isSystem: true,
+        perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'blog.publish', 'comment.create', 'comment.view', 'comment.update', 'comment.delete', 'media.upload', 'media.view'],
+      },
+      {
+        name: 'Contributor', slug: 'contributor', isSystem: true,
+        perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
+      },
+      {
+        name: 'User', slug: 'user', isSystem: true,
+        perms: ['blog.view', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
+      },
+    ];
+
+    const roles: Role[] = [];
+    for (const r of roleDefs) {
+      const role = await Role.create({ name: r.name, slug: r.slug, description: null, isSystem: r.isSystem }, { transaction: t });
+      roles.push(role);
+      if (r.perms.length) {
+        await RolePermission.bulkCreate(r.perms.map((s) => ({ roleId: role.id, permissionId: permBySlug.get(s)! })), { transaction: t });
+      }
     }
-  }
-  const roleBySlug = new Map(roles.map((r) => [r.slug, r]));
+    const roleBySlug = new Map(roles.map((r) => [r.slug, r]));
 
-  // Users
-  const users: User[] = [];
-  for (const u of SAMPLE_USERS) {
-    const passwordHash = await bcrypt.hash(u.password, 10);
-    const user = await User.create({ name: u.name, email: u.email, passwordHash, avatar: null, bio: null, status: 'active' });
-    users.push(user);
-    await UserRole.create({ userId: user.id, roleId: roleBySlug.get(u.role)!.id });
-  }
-  const userByEmail = new Map(users.map((u) => [u.email as string, u]));
-
-  // Categories
-  const categories: Category[] = [];
-  for (const name of CATEGORIES) {
-    const cat = await Category.create({ name, slug: slugify(name), description: null, status: 'active', parentId: null });
-    categories.push(cat);
-  }
-  const categoryBySlug = new Map(categories.map((c) => [c.slug, c]));
-
-  // Tags
-  const tags: Tag[] = [];
-  for (const name of TAGS) {
-    tags.push(await Tag.create({ name, slug: name }));
-  }
-  const tagByName = new Map(tags.map((t) => [t.name, t]));
-
-  // Posts
-  for (const p of SAMPLE_POSTS) {
-    const authorId = userByEmail.get(p.authorEmail)!.id;
-    const categoryId = categoryBySlug.get(p.categorySlug)?.id || null;
-    const pubDate = p.publishedAt ? new Date(p.publishedAt) : null;
-    const post = await Post.create({
-      authorId, categoryId, title: p.title, slug: slugify(p.title),
-      excerpt: p.excerpt, content: p.content, featuredImage: null,
-      status: p.status, visibility: 'public', publishedAt: pubDate,
-      createdAt: pubDate || new Date(), updatedAt: pubDate || new Date(),
-    });
-    if (p.tagNames.length) {
-      const postTags = p.tagNames.map((n) => tagByName.get(n)!).filter(Boolean);
-      await PostTag.bulkCreate(postTags.map((t) => ({ postId: post.id, tagId: t.id })));
+    // Users
+    const users: User[] = [];
+    for (const u of SAMPLE_USERS) {
+      const passwordHash = await bcrypt.hash(u.password, 10);
+      const user = await User.create({ name: u.name, email: u.email, passwordHash, avatar: null, bio: null, status: 'active' }, { transaction: t });
+      users.push(user);
+      await UserRole.create({ userId: user.id, roleId: roleBySlug.get(u.role)!.id }, { transaction: t });
     }
-    await PostRevision.create({
-      postId: post.id, userId: authorId, title: p.title, excerpt: p.excerpt,
-      content: p.content, featuredImage: null, revisionNumber: 1,
-      createdAt: pubDate || new Date(),
-    });
+    const userByEmail = new Map(users.map((u) => [u.email as string, u]));
+
+    // Categories
+    const categories: Category[] = [];
+    for (const name of CATEGORIES) {
+      const cat = await Category.create({ name, slug: slugify(name), description: null, status: 'active', parentId: null }, { transaction: t });
+      categories.push(cat);
+    }
+    const categoryBySlug = new Map(categories.map((c) => [c.slug, c]));
+
+    // Tags
+    const tags: Tag[] = [];
+    for (const name of TAGS) {
+      tags.push(await Tag.create({ name, slug: name }, { transaction: t }));
+    }
+    const tagByName = new Map(tags.map((t) => [t.name, t]));
+
+    // Posts
+    for (const p of SAMPLE_POSTS) {
+      const authorId = userByEmail.get(p.authorEmail)!.id;
+      const categoryId = categoryBySlug.get(p.categorySlug)?.id || null;
+      const pubDate = p.publishedAt ? new Date(p.publishedAt) : null;
+      const post = await Post.create({
+        authorId, categoryId, title: p.title, slug: slugify(p.title),
+        excerpt: p.excerpt, content: p.content, featuredImage: null,
+        status: p.status, visibility: 'public', publishedAt: pubDate,
+        createdAt: pubDate || new Date(), updatedAt: pubDate || new Date(),
+      }, { transaction: t });
+      if (p.tagNames.length) {
+        const postTags = p.tagNames.map((n) => tagByName.get(n)!).filter(Boolean);
+        await PostTag.bulkCreate(postTags.map((tg) => ({ postId: post.id, tagId: tg.id })), { transaction: t });
+      }
+      await PostRevision.create({
+        postId: post.id, userId: authorId, title: p.title, excerpt: p.excerpt,
+        content: p.content, featuredImage: null, revisionNumber: 1,
+        createdAt: pubDate || new Date(),
+      }, { transaction: t });
+    }
+
+    // Comments
+    const postByTitle = new Map((await Post.findAll({ transaction: t })).map((p) => [p.title, p]));
+    for (const c of SAMPLE_COMMENTS) {
+      const post = postByTitle.get(c.postTitle);
+      if (!post) continue;
+      const user = userByEmail.get(c.authorEmail);
+      if (!user) continue;
+      await Comment.create({
+        postId: post.id, userId: user.id, parentId: null,
+        content: c.content, status: 'approved',
+        createdAt: new Date('2026-08-15T10:00:00Z'), updatedAt: new Date('2026-08-15T10:00:00Z'),
+      }, { transaction: t });
+    }
+
+    // Media
+    const mediaItems = [
+      { authorEmail: 'alice@example.com', fileName: 'code-on-screen.png', originalName: 'code-on-screen.png', mimeType: 'image/png', altText: 'Code on a screen' },
+      { authorEmail: 'alice@example.com', fileName: 'productivity-desk.jpg', originalName: 'productivity-desk.jpg', mimeType: 'image/jpeg', altText: 'A tidy productivity desk' },
+      { authorEmail: 'bob@example.com', fileName: 'sourdough-loaf.jpg', originalName: 'sourdough-loaf.jpg', mimeType: 'image/jpeg', altText: 'A freshly baked sourdough loaf' },
+      { authorEmail: 'dave@example.com', fileName: 'tropical-beach.jpg', originalName: 'tropical-beach.jpg', mimeType: 'image/jpeg', altText: 'A tropical beach at sunset' },
+    ];
+    for (const m of mediaItems) {
+      const user = userByEmail.get(m.authorEmail);
+      if (!user) continue;
+      await Media.create({
+        userId: user.id, fileName: m.fileName, originalName: m.originalName,
+        mimeType: m.mimeType, fileSize: 122880, url: `/uploads/${m.fileName}`,
+        altText: m.altText, createdAt: new Date(),
+      }, { transaction: t });
+    }
+
+    // Settings
+    await Setting.bulkCreate(Object.entries(SETTINGS).map(([key, value]) => ({ key, value })), { transaction: t });
+
+    // Notification
+    await Notification.create({
+      userId: users[0].id, type: 'system', title: 'Welcome to the Blog',
+      message: 'Your account has been set up successfully.', data: null, readAt: null,
+    }, { transaction: t });
+
+    // Audit log
+    await AuditLog.create({
+      userId: users[0].id, action: 'system.seed', module: 'system',
+      entityType: null, entityId: null, ipAddress: '127.0.0.1',
+      userAgent: 'Seeder', oldValues: null, newValues: null,
+      createdAt: new Date(),
+    }, { transaction: t });
+
+    await t.commit();
+    console.log('Database seeded successfully.');
+  } catch (e) {
+    await t.rollback();
+    throw e;
   }
-
-  // Comments
-  const postByTitle = new Map((await Post.findAll()).map((p) => [p.title, p]));
-  for (const c of SAMPLE_COMMENTS) {
-    const post = postByTitle.get(c.postTitle);
-    if (!post) continue;
-    const user = userByEmail.get(c.authorEmail);
-    if (!user) continue;
-    await Comment.create({
-      postId: post.id, userId: user.id, parentId: null,
-      content: c.content, status: 'approved',
-      createdAt: new Date('2026-08-15T10:00:00Z'), updatedAt: new Date('2026-08-15T10:00:00Z'),
-    });
-  }
-
-  // Media
-  const mediaItems = [
-    { authorEmail: 'alice@example.com', fileName: 'code-on-screen.png', originalName: 'code-on-screen.png', mimeType: 'image/png', altText: 'Code on a screen' },
-    { authorEmail: 'alice@example.com', fileName: 'productivity-desk.jpg', originalName: 'productivity-desk.jpg', mimeType: 'image/jpeg', altText: 'A tidy productivity desk' },
-    { authorEmail: 'bob@example.com', fileName: 'sourdough-loaf.jpg', originalName: 'sourdough-loaf.jpg', mimeType: 'image/jpeg', altText: 'A freshly baked sourdough loaf' },
-    { authorEmail: 'dave@example.com', fileName: 'tropical-beach.jpg', originalName: 'tropical-beach.jpg', mimeType: 'image/jpeg', altText: 'A tropical beach at sunset' },
-  ];
-  for (const m of mediaItems) {
-    const user = userByEmail.get(m.authorEmail);
-    if (!user) continue;
-    await Media.create({
-      userId: user.id, fileName: m.fileName, originalName: m.originalName,
-      mimeType: m.mimeType, fileSize: 122880, url: `/uploads/${m.fileName}`,
-      altText: m.altText, createdAt: new Date(),
-    });
-  }
-
-  // Settings
-  await Setting.bulkCreate(Object.entries(SETTINGS).map(([key, value]) => ({ key, value })));
-
-  // Notification
-  await Notification.create({
-    userId: users[0].id, type: 'system', title: 'Welcome to the Blog',
-    message: 'Your account has been set up successfully.', data: null, readAt: null,
-  });
-
-  // Audit log
-  await AuditLog.create({
-    userId: users[0].id, action: 'system.seed', module: 'system',
-    entityType: null, entityId: null, ipAddress: '127.0.0.1',
-    userAgent: 'Seeder', oldValues: null, newValues: null,
-    createdAt: new Date(),
-  });
-
-  console.log('Database seeded successfully.');
 }
 
-// Auto-run when executed directly
-if (require.main === module) {
-  seedDatabase().then(() => sequelize.close()).catch((e) => { console.error(e); process.exit(1); });
-}

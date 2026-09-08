@@ -12,11 +12,11 @@ export const sequelize = new Sequelize({
   },
 });
 
-let _initialized = false;
+const g = globalThis as unknown as { __blogDbInitialized?: boolean };
 
 export async function initDatabase() {
-  if (_initialized) return;
-  _initialized = true;
+  if (g.__blogDbInitialized) return;
+  g.__blogDbInitialized = true;
 
   // Import all models so they register with sequelize
   await import('@/database/models/User');
@@ -35,5 +35,5 @@ export async function initDatabase() {
   await import('@/database/models/Notification');
   await import('@/database/models/Setting');
 
-  await sequelize.sync({ alter: true });
+  await sequelize.sync();
 }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Post, User, Category, Tag } from '@/database/seeders';
+import { ensureDb, Post, User, Category, Tag, PostTag } from '@/database/seeders';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [
   { model: User, as: 'author' },
@@ -26,11 +27,12 @@ export async function GET(req: NextRequest) {
   if (tag) {
     const t = await Tag.findOne({ where: { slug: tag } });
     if (t) {
-      const posts = await t.$get('posts' as never, { where, include });
-      const ids = posts.map((p: any) => p.id);
+      const links = await PostTag.findAll({ where: { tagId: t.id } });
+      const ids = links.map((l) => l.postId);
       const rows = (await Post.findAll({ where: { id: ids, ...where }, include })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const start = (page - 1) * limit;
       return NextResponse.json({
-        success: true, message: 'Posts fetched', data: rows,
+        success: true, message: 'Posts fetched', data: rows.slice(start, start + limit),
         meta: { page, limit, total: rows.length, totalPages: Math.ceil(rows.length / limit) },
       });
     }

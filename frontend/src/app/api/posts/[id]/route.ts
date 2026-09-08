@@ -3,6 +3,7 @@ import { ensureDb, Post, User, Category, Tag, PostTag, PostRevision, Comment, se
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [
   { model: User, as: 'author' },

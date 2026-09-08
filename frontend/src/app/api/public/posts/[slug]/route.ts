@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureDb, Post, User, Category, Tag } from '@/database/seeders';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
   await ensureDb();

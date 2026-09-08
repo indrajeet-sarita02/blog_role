@@ -3,6 +3,7 @@ import { ensureDb, Media, User } from '@/database/seeders';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [{ model: User, as: 'user' }];
 

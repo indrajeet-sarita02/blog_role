@@ -3,6 +3,7 @@ import { ensureDb, User, Role } from '@/database/seeders';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   await ensureDb();

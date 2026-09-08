@@ -11,10 +11,10 @@ interface RequestOptions {
   isFormData?: boolean;
 }
 
-export async function apiRequest(
+export async function apiRequest<T = any>(
   path: string,
   options: RequestOptions = {},
-): Promise<{ success: boolean; message: string; data: unknown; meta?: unknown }> {
+): Promise<T> {
   const token = getAccessToken();
   const headers: Record<string, string> = {};
   if (!options.isFormData) headers['Content-Type'] = 'application/json';

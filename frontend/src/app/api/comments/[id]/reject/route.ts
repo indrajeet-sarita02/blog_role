@@ -3,6 +3,7 @@ import { ensureDb, Comment, User } from '@/database/seeders';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();

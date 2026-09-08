@@ -4,6 +4,7 @@ import { getUserIdFromRequest } from '@/lib/auth/server';
 import { slugify } from '@/lib/utils/slug';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const include = [
   { model: User, as: 'author' },

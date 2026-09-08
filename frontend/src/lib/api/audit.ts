@@ -1,38 +1,33 @@
-import { getStore, delay } from '@/lib/mock/store';
+import { apiRequest } from '@/lib/api/client';
 import { ApiListResponse } from '@/types';
-import { AuditLogEntry } from '@/lib/mock/store';
 
-export type { AuditLogEntry } from '@/lib/mock/store';
+export interface AuditLogEntry {
+  id: number;
+  userId: number | null;
+  actorId?: number | null;
+  action: string;
+  module: string;
+  entityType?: string | null;
+  entityId?: number | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  oldValues?: Record<string, unknown> | null;
+  newValues?: Record<string, unknown> | null;
+  createdAt: string;
+  actor?: { id: number; name: string; email: string } | null;
+}
+
 export type AuditLog = AuditLogEntry;
 
+type ApiBody<T> = { success: boolean; message: string; data: T; meta?: unknown };
+
 export async function fetchAuditLogs(params?: Record<string, string>) {
-  await delay();
-  const store = getStore();
-  let logs = [...store.auditLogs];
-
-  if (params?.module) logs = logs.filter((l) => l.module === params.module);
-  if (params?.action) logs = logs.filter((l) => l.action === params.action);
-
-  logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const page = parseInt(params?.page || '1');
-  const limit = parseInt(params?.limit || '20');
-  const total = logs.length;
-  const start = (page - 1) * limit;
-  const paged = logs.slice(start, start + limit);
-
-  return {
-    success: true,
-    message: 'Audit logs fetched',
-    data: paged,
-    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  } as ApiListResponse<AuditLogEntry>;
+  const qs = new URLSearchParams(params || {}).toString();
+  const res = await apiRequest<ApiBody<AuditLogEntry[]>>(`/api/audit${qs ? `?${qs}` : ''}`);
+  return res as unknown as ApiListResponse<AuditLogEntry>;
 }
 
 export async function fetchAuditLog(id: number) {
-  await delay();
-  const store = getStore();
-  const log = store.auditLogs.find((l) => l.id === id);
-  if (!log) throw new Error('Audit log not found');
-  return log;
+  const res = await apiRequest<ApiBody<AuditLogEntry>>(`/api/audit/${id}`);
+  return res.data;
 }

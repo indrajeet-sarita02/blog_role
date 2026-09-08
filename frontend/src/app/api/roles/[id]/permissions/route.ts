@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureDb, Role, Permission, RolePermission } from '@/database/seeders';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
@@ -10,7 +11,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!role) {
     return NextResponse.json({ success: false, message: 'Role not found' }, { status: 404 });
   }
-  const perms = await role.$get('permissions' as never);
+  const links = await RolePermission.findAll({ where: { roleId } });
+  const permIds = links.map((l) => l.permissionId);
+  const perms = await Permission.findAll({ where: { id: permIds }, order: [['module', 'ASC'], ['id', 'ASC']] });
   return NextResponse.json({ success: true, message: 'Role permissions fetched', data: perms });
 }
 
@@ -30,6 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (permissionIds.length) {
     await RolePermission.bulkCreate(permissionIds.map((pid: number) => ({ roleId, permissionId: pid })));
   }
-  const perms = await role.$get('permissions' as never);
+  const permIds = permissionIds;
+  const perms = await Permission.findAll({ where: { id: permIds }, order: [['module', 'ASC'], ['id', 'ASC']] });
   return NextResponse.json({ success: true, message: 'Role permissions updated', data: perms });
 }
