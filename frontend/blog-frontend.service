@@ -1,0 +1,20 @@
+[Unit]
+Description=Blog Frontend (Next.js production server)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/lampp/htdocs/blog/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Long random value; must match across restarts
+Environment=JWT_SECRET=change-me-to-a-long-random-string
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
