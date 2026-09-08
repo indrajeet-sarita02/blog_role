@@ -12,6 +12,7 @@ import {
 } from '@/types';
 
 const STORAGE_KEY = 'blog_mock_store';
+const STORE_VERSION = 2;
 
 export interface AuditLogEntry {
   id: number;
@@ -33,6 +34,7 @@ export interface Settings {
 }
 
 export interface MockStore {
+  version?: number;
   users: User[];
   roles: Role[];
   permissions: Permission[];
@@ -515,7 +517,30 @@ function createSeedStore(): MockStore {
     actor: { id: store.users[0].id, name: store.users[0].name, email: store.users[0].email },
   });
 
+  store.version = STORE_VERSION;
+
   return store;
+}
+
+function isValidStore(raw: unknown): raw is MockStore {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const s = raw as MockStore;
+  if (s.version !== STORE_VERSION) return false;
+  return Array.isArray(s.users)
+    && Array.isArray(s.roles)
+    && Array.isArray(s.permissions)
+    && Array.isArray(s.categories)
+    && Array.isArray(s.tags)
+    && Array.isArray(s.posts)
+    && Array.isArray(s.comments)
+    && Array.isArray(s.media)
+    && Array.isArray(s.notifications)
+    && Array.isArray(s.postRevisions)
+    && Array.isArray(s.auditLogs)
+    && s.settings !== null
+    && typeof s.settings === 'object'
+    && typeof s.nextIds === 'object'
+    && s.nextIds !== null;
 }
 
 function loadStore(): MockStore {
@@ -525,8 +550,11 @@ function loadStore(): MockStore {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      _store = JSON.parse(raw);
-      return _store!;
+      const parsed = JSON.parse(raw);
+      if (isValidStore(parsed)) {
+        _store = parsed;
+        return _store;
+      }
     }
   } catch {
     // ignore
