@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Notification } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
@@ -11,6 +11,9 @@ export async function PATCH(req: NextRequest) {
   if (!userId) {
     return NextResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 });
   }
-  await Notification.update({ readAt: new Date() }, { where: { userId, readAt: null } });
+  await prisma.notification.updateMany({
+    where: { userId, readAt: null },
+    data: { readAt: new Date() },
+  });
   return NextResponse.json({ success: true, message: 'All notifications marked read' });
 }

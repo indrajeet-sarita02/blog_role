@@ -12,6 +12,9 @@ const nextConfig = {
       'tedious',
       'oracledb',
       'better-sqlite3',
+      '@prisma/client',
+      '@prisma/extension-accelerate',
+      'bcrypt',
     ],
   },
 };

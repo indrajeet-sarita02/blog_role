@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Category } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
-  const cat = await Category.findByPk(parseInt(params.id));
+  const cat = await prisma.category.findUnique({ where: { id: parseInt(params.id) } });
   if (!cat) {
     return NextResponse.json({ success: false, message: 'Category not found' }, { status: 404 });
   }
@@ -16,25 +16,26 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
   const body = await req.json().catch(() => ({}));
-  const cat = await Category.findByPk(parseInt(params.id));
+  const cat = await prisma.category.findUnique({ where: { id: parseInt(params.id) } });
   if (!cat) {
     return NextResponse.json({ success: false, message: 'Category not found' }, { status: 404 });
   }
-  if (body.name !== undefined) cat.name = body.name;
-  if (body.slug !== undefined) cat.slug = body.slug;
-  if (body.description !== undefined) cat.description = body.description;
-  if (body.parentId !== undefined) cat.parentId = body.parentId;
-  if (body.status !== undefined) cat.status = body.status;
-  await cat.save();
-  return NextResponse.json({ success: true, message: 'Category updated', data: cat });
+  const data: Record<string, unknown> = {};
+  if (body.name !== undefined) data.name = body.name;
+  if (body.slug !== undefined) data.slug = body.slug;
+  if (body.description !== undefined) data.description = body.description;
+  if (body.parentId !== undefined) data.parentId = body.parentId;
+  if (body.status !== undefined) data.status = body.status;
+  const updated = await prisma.category.update({ where: { id: cat.id }, data });
+  return NextResponse.json({ success: true, message: 'Category updated', data: updated });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
-  const cat = await Category.findByPk(parseInt(params.id));
+  const cat = await prisma.category.findUnique({ where: { id: parseInt(params.id) } });
   if (!cat) {
     return NextResponse.json({ success: false, message: 'Category not found' }, { status: 404 });
   }
-  await cat.destroy();
+  await prisma.category.delete({ where: { id: cat.id } });
   return NextResponse.json({ success: true, message: 'Category deleted' });
 }

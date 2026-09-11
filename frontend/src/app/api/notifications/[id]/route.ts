@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Notification } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
@@ -11,10 +11,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (!userId) {
     return NextResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 });
   }
-  const notif = await Notification.findOne({ where: { id: parseInt(params.id), userId } });
+  const notif = await prisma.notification.findFirst({
+    where: { id: parseInt(params.id), userId },
+  });
   if (!notif) {
     return NextResponse.json({ success: false, message: 'Notification not found' }, { status: 404 });
   }
-  await notif.destroy();
+  await prisma.notification.delete({
+    where: { id: notif.id },
+  });
   return NextResponse.json({ success: true, message: 'Notification deleted' });
 }

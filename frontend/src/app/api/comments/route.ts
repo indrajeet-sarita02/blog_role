@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Comment, User } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { memberUserSelect } from '@/database/shapes';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const include = [{ model: User, as: 'user' }];
 
 export async function GET(req: NextRequest) {
   await ensureDb();
@@ -15,11 +14,20 @@ export async function GET(req: NextRequest) {
   const page = parseInt(params.get('page') || '1');
   const limit = Math.min(parseInt(params.get('limit') || '20'), 100);
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { deletedAt: null };
   if (postId) where.postId = parseInt(postId);
   if (status) where.status = status;
 
-  const { count, rows } = await Comment.findAndCountAll({ where, include, limit, offset: (page - 1) * limit, order: [['createdAt', 'DESC']] });
+  const [count, rows] = await Promise.all([
+    prisma.comment.count({ where }),
+    prisma.comment.findMany({
+      where,
+      include: { user: { select: memberUserSelect } },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: (page - 1) * limit,
+    }),
+  ]);
   return NextResponse.json({
     success: true, message: 'Comments fetched', data: rows,
     meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },

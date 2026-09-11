@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, AuditLog, User } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { memberUserSelect } from '@/database/shapes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const include = [{ model: User, as: 'user' }];
 
 export async function GET(req: NextRequest) {
   await ensureDb();
@@ -18,7 +17,16 @@ export async function GET(req: NextRequest) {
   if (module) where.module = module;
   if (action) where.action = action;
 
-  const { count, rows } = await AuditLog.findAndCountAll({ where, include, limit, offset: (page - 1) * limit, order: [['createdAt', 'DESC']] });
+  const [count, rows] = await Promise.all([
+    prisma.auditLog.count({ where }),
+    prisma.auditLog.findMany({
+      where,
+      include: { user: { select: memberUserSelect } },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: (page - 1) * limit,
+    }),
+  ]);
   return NextResponse.json({
     success: true, message: 'Audit logs fetched', data: rows,
     meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },

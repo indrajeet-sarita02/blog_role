@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, User, Role } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { getUserWithRoles } from '@/database/shapes';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
@@ -12,10 +13,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 });
   }
 
-  const user = await User.findOne({
-    where: { id: userId },
-    include: [{ model: Role, as: 'roles' }],
-  });
+  const user = await getUserWithRoles(userId);
   if (!user) {
     return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
   }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Media, User } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { memberUserSelect } from '@/database/shapes';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const include = [{ model: User, as: 'user' }];
+const mediaInclude = { user: { select: memberUserSelect } };
 
 export async function GET(req: NextRequest) {
   await ensureDb();
@@ -16,7 +17,10 @@ export async function GET(req: NextRequest) {
 
   if (search) {
     const s = search.toLowerCase();
-    const all = await Media.findAll({ include });
+    const all = await prisma.media.findMany({
+      where: { deletedAt: null },
+      include: mediaInclude,
+    });
     const filtered = all.filter((m) => (m.originalName || '').toLowerCase().includes(s) || (m.altText || '').toLowerCase().includes(s));
     return NextResponse.json({
       success: true, message: 'Media fetched', data: filtered,
@@ -24,7 +28,17 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const { count, rows } = await Media.findAndCountAll({ include, limit, offset: (page - 1) * limit, order: [['createdAt', 'DESC']] });
+  const where = { deletedAt: null };
+  const [count, rows] = await Promise.all([
+    prisma.media.count({ where }),
+    prisma.media.findMany({
+      where,
+      include: mediaInclude,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: (page - 1) * limit,
+    }),
+  ]);
   return NextResponse.json({
     success: true, message: 'Media fetched', data: rows,
     meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
@@ -44,10 +58,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'File is required' }, { status: 400 });
   }
   const fileName = file.name || 'upload';
-  const media = await Media.create({
-    userId, fileName, originalName: fileName, mimeType: file.type || 'application/octet-stream',
-    fileSize: file.size, url: `/uploads/${fileName}`, altText,
+  const media = await prisma.media.create({
+    data: {
+      userId, fileName, originalName: fileName, mimeType: file.type || 'application/octet-stream',
+      fileSize: file.size, url: `/uploads/${fileName}`, altText,
+    },
   });
-  const full = await Media.findByPk(media.id, { include });
+  const full = await prisma.media.findUnique({
+    where: { id: media.id },
+    include: mediaInclude,
+  });
   return NextResponse.json({ success: true, message: 'Media uploaded', data: full }, { status: 201 });
 }

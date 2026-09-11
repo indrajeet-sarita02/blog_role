@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Post, User, Category, Tag, PostTag, PostRevision, Comment, sequelize } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { shapePost, memberUserSelect } from '@/database/shapes';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const include = [
-  { model: User, as: 'author' },
-  { model: Category, as: 'category' },
-  { model: Tag, as: 'tags' },
-];
+const postInclude = {
+  author: { select: memberUserSelect },
+  category: true,
+  tags: { include: { tag: true } },
+};
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
-  const post = await Post.findOne({ where: { id: parseInt(params.id) }, include });
+  const post = await prisma.post.findUnique({ where: { id: parseInt(params.id), deletedAt: null }, include: postInclude });
   if (!post) {
     return NextResponse.json({ success: false, message: 'Post not found' }, { status: 404 });
   }
-  return NextResponse.json({ success: true, message: 'Post fetched', data: post });
+  return NextResponse.json({ success: true, message: 'Post fetched', data: shapePost(post) });
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -28,55 +29,56 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
   const body = await req.json().catch(() => ({}));
   const id = parseInt(params.id);
-  const post = await Post.findByPk(id);
+  const post = await prisma.post.findUnique({ where: { id, deletedAt: null } });
   if (!post) {
     return NextResponse.json({ success: false, message: 'Post not found' }, { status: 404 });
   }
 
-  if (body.title !== undefined) post.title = body.title;
-  if (body.slug !== undefined) post.slug = body.slug;
-  if (body.content !== undefined) post.content = body.content;
-  if (body.excerpt !== undefined) post.excerpt = body.excerpt;
-  if (body.categoryId !== undefined) post.categoryId = body.categoryId;
-  if (body.featuredImage !== undefined) post.featuredImage = body.featuredImage;
+  const data: Record<string, unknown> = {};
+  if (body.title !== undefined) data.title = body.title;
+  if (body.slug !== undefined) data.slug = body.slug;
+  if (body.content !== undefined) data.content = body.content;
+  if (body.excerpt !== undefined) data.excerpt = body.excerpt;
+  if (body.categoryId !== undefined) data.categoryId = body.categoryId;
+  if (body.featuredImage !== undefined) data.featuredImage = body.featuredImage;
   if (body.status !== undefined) {
-    post.status = body.status;
-    if (body.status === 'published' && !post.publishedAt) post.publishedAt = new Date();
+    data.status = body.status;
+    if (body.status === 'published' && !post.publishedAt) data.publishedAt = new Date();
   }
-  if (body.visibility !== undefined) post.visibility = body.visibility;
+  if (body.visibility !== undefined) data.visibility = body.visibility;
 
-  await sequelize.transaction(async (t) => {
-    await post.save({ transaction: t });
-    if (Array.isArray(body.tagIds)) {
-      await PostTag.destroy({ where: { postId: id }, transaction: t });
-      if (body.tagIds.length) {
-        await PostTag.bulkCreate(body.tagIds.map((tid: number) => ({ postId: id, tagId: tid })), { transaction: t });
-      }
+  const updated = await prisma.post.update({ where: { id }, data });
+
+  if (Array.isArray(body.tagIds)) {
+    await prisma.postTag.deleteMany({ where: { postId: id } });
+    if (body.tagIds.length) {
+      await prisma.postTag.createMany({ data: body.tagIds.map((tid: number) => ({ postId: id, tagId: tid })) });
     }
-    const revCount = await PostRevision.count({ where: { postId: id }, transaction: t });
-    await PostRevision.create({
-      postId: id, userId, title: post.title, excerpt: post.excerpt,
-      content: post.content, featuredImage: post.featuredImage,
-      revisionNumber: revCount + 1, createdAt: new Date(),
-    }, { transaction: t });
+  }
+
+  const revCount = await prisma.postRevision.count({ where: { postId: id } });
+  await prisma.postRevision.create({
+    data: {
+      postId: id, userId, title: updated.title, excerpt: updated.excerpt,
+      content: updated.content, featuredImage: updated.featuredImage,
+      revisionNumber: revCount + 1,
+    },
   });
 
-  const full = await Post.findOne({ where: { id }, include });
-  return NextResponse.json({ success: true, message: 'Post updated', data: full });
+  const full = await prisma.post.findUnique({ where: { id }, include: postInclude });
+  return NextResponse.json({ success: true, message: 'Post updated', data: shapePost(full!) });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   await ensureDb();
   const id = parseInt(params.id);
-  const post = await Post.findByPk(id);
+  const post = await prisma.post.findUnique({ where: { id, deletedAt: null } });
   if (!post) {
     return NextResponse.json({ success: false, message: 'Post not found' }, { status: 404 });
   }
-  await sequelize.transaction(async (t) => {
-    await Comment.destroy({ where: { postId: id }, force: true, transaction: t });
-    await PostTag.destroy({ where: { postId: id }, transaction: t });
-    await PostRevision.destroy({ where: { postId: id }, transaction: t });
-    await post.destroy({ transaction: t });
-  });
+  await prisma.comment.deleteMany({ where: { postId: id } });
+  await prisma.postTag.deleteMany({ where: { postId: id } });
+  await prisma.postRevision.deleteMany({ where: { postId: id } });
+  await prisma.post.update({ where: { id }, data: { deletedAt: new Date() } });
   return NextResponse.json({ success: true, message: 'Post deleted' });
 }

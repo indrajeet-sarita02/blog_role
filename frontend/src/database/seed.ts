@@ -1,19 +1,5 @@
-import { initDatabase, sequelize } from '@/database';
-import User from '@/database/models/User';
-import Role from '@/database/models/Role';
-import Permission from '@/database/models/Permission';
-import UserRole from '@/database/models/UserRole';
-import RolePermission from '@/database/models/RolePermission';
-import Category from '@/database/models/Category';
-import Tag from '@/database/models/Tag';
-import Post from '@/database/models/Post';
-import PostTag from '@/database/models/PostTag';
-import PostRevision from '@/database/models/PostRevision';
-import Comment from '@/database/models/Comment';
-import Media from '@/database/models/Media';
-import AuditLog from '@/database/models/AuditLog';
-import Notification from '@/database/models/Notification';
-import Setting from '@/database/models/Setting';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/database/prisma';
 import bcrypt from 'bcrypt';
 
 function slugify(text: string): string {
@@ -133,153 +119,159 @@ const SETTINGS: Record<string, string> = {
   'site.time_zone': 'UTC',
 };
 
-export async function seedDatabase() {
-  await initDatabase();
+export async function seedDatabase(): Promise<void> {
+  const count = await prisma.user.count();
+  if (count > 0) return;
 
-  const count = await User.count();
-  if (count > 0) return; // already seeded
+  // Permissions
+  const permissionIds = new Map<string, number>();
+  for (const p of PERMISSIONS) {
+    const perm = await prisma.permission.create({ data: { name: p.name, slug: p.slug, module: p.module, description: null } });
+    permissionIds.set(p.slug, perm.id);
+  }
 
-  const t = await sequelize.transaction();
+  const roleDefs = [
+    { name: 'Super Admin', slug: 'super-admin', perms: PERMISSIONS.map((p) => p.slug), isSystem: true },
+    { name: 'Admin', slug: 'admin', perms: PERMISSIONS.filter((p) => !p.slug.startsWith('role.')).map((p) => p.slug), isSystem: true },
+    {
+      name: 'Editor', slug: 'editor', isSystem: true,
+      perms: ['blog.create', 'blog.view', 'blog.viewAny', 'blog.update', 'blog.updateAny', 'blog.delete', 'blog.deleteAny', 'blog.publish', 'blog.approve', 'blog.reject', 'blog.archive', 'comment.create', 'comment.view', 'comment.viewAny', 'comment.update', 'comment.updateAny', 'comment.delete', 'comment.deleteAny', 'comment.approve', 'comment.reject', 'category.create', 'category.view', 'category.update', 'category.delete', 'tag.create', 'tag.view', 'tag.update', 'tag.delete', 'media.upload', 'media.view', 'media.delete'],
+    },
+    {
+      name: 'Author', slug: 'author', isSystem: true,
+      perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'blog.publish', 'comment.create', 'comment.view', 'comment.update', 'comment.delete', 'media.upload', 'media.view'],
+    },
+    {
+      name: 'Contributor', slug: 'contributor', isSystem: true,
+      perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
+    },
+    {
+      name: 'User', slug: 'user', isSystem: true,
+      perms: ['blog.view', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
+    },
+  ];
 
-  try {
-    // Permissions
-    const permRecords = await Permission.bulkCreate(
-      PERMISSIONS.map((p) => ({ name: p.name, slug: p.slug, module: p.module, description: null })),
-      { transaction: t },
-    );
-    const permBySlug = new Map(permRecords.map((p) => [p.slug, p.id]));
-
-    const roleDefs = [
-      { name: 'Super Admin', slug: 'super-admin', perms: PERMISSIONS.map((p) => p.slug), isSystem: true },
-      { name: 'Admin', slug: 'admin', perms: PERMISSIONS.filter((p) => !p.slug.startsWith('role.')).map((p) => p.slug), isSystem: true },
-      {
-        name: 'Editor', slug: 'editor', isSystem: true,
-        perms: ['blog.create', 'blog.view', 'blog.viewAny', 'blog.update', 'blog.updateAny', 'blog.delete', 'blog.deleteAny', 'blog.publish', 'blog.approve', 'blog.reject', 'blog.archive', 'comment.create', 'comment.view', 'comment.viewAny', 'comment.update', 'comment.updateAny', 'comment.delete', 'comment.deleteAny', 'comment.approve', 'comment.reject', 'category.create', 'category.view', 'category.update', 'category.delete', 'tag.create', 'tag.view', 'tag.update', 'tag.delete', 'media.upload', 'media.view', 'media.delete'],
-      },
-      {
-        name: 'Author', slug: 'author', isSystem: true,
-        perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'blog.publish', 'comment.create', 'comment.view', 'comment.update', 'comment.delete', 'media.upload', 'media.view'],
-      },
-      {
-        name: 'Contributor', slug: 'contributor', isSystem: true,
-        perms: ['blog.create', 'blog.view', 'blog.update', 'blog.delete', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
-      },
-      {
-        name: 'User', slug: 'user', isSystem: true,
-        perms: ['blog.view', 'comment.create', 'comment.view', 'comment.update', 'comment.delete'],
-      },
-    ];
-
-    const roles: Role[] = [];
-    for (const r of roleDefs) {
-      const role = await Role.create({ name: r.name, slug: r.slug, description: null, isSystem: r.isSystem }, { transaction: t });
-      roles.push(role);
-      if (r.perms.length) {
-        await RolePermission.bulkCreate(r.perms.map((s) => ({ roleId: role.id, permissionId: permBySlug.get(s)! })), { transaction: t });
+  const roles = new Map<string, number>();
+  for (const r of roleDefs) {
+    const role = await prisma.role.create({ data: { name: r.name, slug: r.slug, description: null, isSystem: r.isSystem } });
+    roles.set(r.slug, role.id);
+    for (const s of r.perms) {
+      const permissionId = permissionIds.get(s);
+      if (permissionId) {
+        await prisma.rolePermission.create({ data: { roleId: role.id, permissionId } });
       }
     }
-    const roleBySlug = new Map(roles.map((r) => [r.slug, r]));
+  }
 
-    // Users
-    const users: User[] = [];
-    for (const u of SAMPLE_USERS) {
-      const passwordHash = await bcrypt.hash(u.password, 10);
-      const user = await User.create({ name: u.name, email: u.email, passwordHash, avatar: null, bio: null, status: 'active' }, { transaction: t });
-      users.push(user);
-      await UserRole.create({ userId: user.id, roleId: roleBySlug.get(u.role)!.id }, { transaction: t });
+  // Users
+  const userByEmail = new Map<string, number>();
+  for (const u of SAMPLE_USERS) {
+    const passwordHash = await bcrypt.hash(u.password, 10);
+    const user = await prisma.user.create({ data: { name: u.name, email: u.email, passwordHash, avatar: null, bio: null, status: 'active' } });
+    userByEmail.set(u.email, user.id);
+    const roleId = roles.get(u.role);
+    if (roleId) {
+      await prisma.userRole.create({ data: { userId: user.id, roleId } });
     }
-    const userByEmail = new Map(users.map((u) => [u.email as string, u]));
+  }
 
-    // Categories
-    const categories: Category[] = [];
-    for (const name of CATEGORIES) {
-      const cat = await Category.create({ name, slug: slugify(name), description: null, status: 'active', parentId: null }, { transaction: t });
-      categories.push(cat);
-    }
-    const categoryBySlug = new Map(categories.map((c) => [c.slug, c]));
+  // Categories
+  const categoryBySlug = new Map<string, number>();
+  for (const name of CATEGORIES) {
+    const cat = await prisma.category.create({ data: { name, slug: slugify(name), description: null, status: 'active', parentId: null } });
+    categoryBySlug.set(cat.slug, cat.id);
+  }
 
-    // Tags
-    const tags: Tag[] = [];
-    for (const name of TAGS) {
-      tags.push(await Tag.create({ name, slug: name }, { transaction: t }));
-    }
-    const tagByName = new Map(tags.map((t) => [t.name, t]));
+  // Tags
+  const tagByName = new Map<string, number>();
+  for (const name of TAGS) {
+    const tag = await prisma.tag.create({ data: { name, slug: name } });
+    tagByName.set(name, tag.id);
+  }
 
-    // Posts
-    for (const p of SAMPLE_POSTS) {
-      const authorId = userByEmail.get(p.authorEmail)!.id;
-      const categoryId = categoryBySlug.get(p.categorySlug)?.id || null;
-      const pubDate = p.publishedAt ? new Date(p.publishedAt) : null;
-      const post = await Post.create({
+  // Posts
+  for (const p of SAMPLE_POSTS) {
+    const authorId = userByEmail.get(p.authorEmail)!;
+    const categoryId = categoryBySlug.get(p.categorySlug) || null;
+    const pubDate = p.publishedAt ? new Date(p.publishedAt) : null;
+    const post = await prisma.post.create({
+      data: {
         authorId, categoryId, title: p.title, slug: slugify(p.title),
         excerpt: p.excerpt, content: p.content, featuredImage: null,
         status: p.status, visibility: 'public', publishedAt: pubDate,
         createdAt: pubDate || new Date(), updatedAt: pubDate || new Date(),
-      }, { transaction: t });
-      if (p.tagNames.length) {
-        const postTags = p.tagNames.map((n) => tagByName.get(n)!).filter(Boolean);
-        await PostTag.bulkCreate(postTags.map((tg) => ({ postId: post.id, tagId: tg.id })), { transaction: t });
+      },
+    });
+    for (const n of p.tagNames) {
+      const tagId = tagByName.get(n);
+      if (tagId) {
+        await prisma.postTag.create({ data: { postId: post.id, tagId } });
       }
-      await PostRevision.create({
+    }
+    await prisma.postRevision.create({
+      data: {
         postId: post.id, userId: authorId, title: p.title, excerpt: p.excerpt,
         content: p.content, featuredImage: null, revisionNumber: 1,
         createdAt: pubDate || new Date(),
-      }, { transaction: t });
-    }
+      },
+    });
+  }
 
-    // Comments
-    const postByTitle = new Map((await Post.findAll({ transaction: t })).map((p) => [p.title, p]));
-    for (const c of SAMPLE_COMMENTS) {
-      const post = postByTitle.get(c.postTitle);
-      if (!post) continue;
-      const user = userByEmail.get(c.authorEmail);
-      if (!user) continue;
-      await Comment.create({
-        postId: post.id, userId: user.id, parentId: null,
-        content: c.content, status: 'approved',
+  // Comments
+  const posts = await prisma.post.findMany();
+  const postByTitle = new Map(posts.map((p) => [p.title, p.id]));
+  for (const c of SAMPLE_COMMENTS) {
+    const postId = postByTitle.get(c.postTitle);
+    const userId = userByEmail.get(c.authorEmail);
+    if (!postId || !userId) continue;
+    await prisma.comment.create({
+      data: {
+        postId, userId, parentId: null, content: c.content, status: 'approved',
         createdAt: new Date('2026-08-15T10:00:00Z'), updatedAt: new Date('2026-08-15T10:00:00Z'),
-      }, { transaction: t });
-    }
+      },
+    });
+  }
 
-    // Media
-    const mediaItems = [
-      { authorEmail: 'alice@example.com', fileName: 'code-on-screen.png', originalName: 'code-on-screen.png', mimeType: 'image/png', altText: 'Code on a screen' },
-      { authorEmail: 'alice@example.com', fileName: 'productivity-desk.jpg', originalName: 'productivity-desk.jpg', mimeType: 'image/jpeg', altText: 'A tidy productivity desk' },
-      { authorEmail: 'bob@example.com', fileName: 'sourdough-loaf.jpg', originalName: 'sourdough-loaf.jpg', mimeType: 'image/jpeg', altText: 'A freshly baked sourdough loaf' },
-      { authorEmail: 'dave@example.com', fileName: 'tropical-beach.jpg', originalName: 'tropical-beach.jpg', mimeType: 'image/jpeg', altText: 'A tropical beach at sunset' },
-    ];
-    for (const m of mediaItems) {
-      const user = userByEmail.get(m.authorEmail);
-      if (!user) continue;
-      await Media.create({
-        userId: user.id, fileName: m.fileName, originalName: m.originalName,
+  // Media
+  const mediaItems = [
+    { authorEmail: 'alice@example.com', fileName: 'code-on-screen.png', originalName: 'code-on-screen.png', mimeType: 'image/png', altText: 'Code on a screen' },
+    { authorEmail: 'alice@example.com', fileName: 'productivity-desk.jpg', originalName: 'productivity-desk.jpg', mimeType: 'image/jpeg', altText: 'A tidy productivity desk' },
+    { authorEmail: 'bob@example.com', fileName: 'sourdough-loaf.jpg', originalName: 'sourdough-loaf.jpg', mimeType: 'image/jpeg', altText: 'A freshly baked sourdough loaf' },
+    { authorEmail: 'dave@example.com', fileName: 'tropical-beach.jpg', originalName: 'tropical-beach.jpg', mimeType: 'image/jpeg', altText: 'A tropical beach at sunset' },
+  ];
+  for (const m of mediaItems) {
+    const userId = userByEmail.get(m.authorEmail);
+    if (!userId) continue;
+    await prisma.media.create({
+      data: {
+        userId, fileName: m.fileName, originalName: m.originalName,
         mimeType: m.mimeType, fileSize: 122880, url: `/uploads/${m.fileName}`,
         altText: m.altText, createdAt: new Date(),
-      }, { transaction: t });
-    }
-
-    // Settings
-    await Setting.bulkCreate(Object.entries(SETTINGS).map(([key, value]) => ({ key, value })), { transaction: t });
-
-    // Notification
-    await Notification.create({
-      userId: users[0].id, type: 'system', title: 'Welcome to the Blog',
-      message: 'Your account has been set up successfully.', data: null, readAt: null,
-    }, { transaction: t });
-
-    // Audit log
-    await AuditLog.create({
-      userId: users[0].id, action: 'system.seed', module: 'system',
-      entityType: null, entityId: null, ipAddress: '127.0.0.1',
-      userAgent: 'Seeder', oldValues: null, newValues: null,
-      createdAt: new Date(),
-    }, { transaction: t });
-
-    await t.commit();
-    console.log('Database seeded successfully.');
-  } catch (e) {
-    await t.rollback();
-    throw e;
+      },
+    });
   }
-}
 
+  // Settings
+  for (const [key, value] of Object.entries(SETTINGS)) {
+    await prisma.setting.create({ data: { key, value } });
+  }
+
+  // Notification
+  const firstUserId = userByEmail.get(SAMPLE_USERS[0].email)!;
+  await prisma.notification.create({
+    data: {
+      userId: firstUserId, type: 'system', title: 'Welcome to the Blog',
+      message: 'Your account has been set up successfully.', data: Prisma.JsonNull, readAt: null,
+    },
+  });
+
+  // Audit log
+  await prisma.auditLog.create({
+    data: {
+      userId: firstUserId, action: 'system.seed', module: 'system',
+      entityType: null, entityId: null, ipAddress: '127.0.0.1',
+      userAgent: 'Seeder', oldValues: Prisma.JsonNull, newValues: Prisma.JsonNull,
+      createdAt: new Date(),
+    },
+  });
+}

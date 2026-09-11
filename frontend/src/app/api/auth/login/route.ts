@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, User, Role, UserRole } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { getUserWithRoles } from '@/database/shapes';
 import bcrypt from 'bcrypt';
 import { signToken } from '@/lib/auth/server';
 
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'Email and password are required' }, { status: 400 });
   }
 
-  const user = await User.scope('withPassword').findOne({ where: { email } });
+  const user = await prisma.user.findFirst({ where: { email } });
   if (!user) {
     return NextResponse.json({ success: false, message: 'Invalid email or password' }, { status: 401 });
   }
@@ -31,10 +32,7 @@ export async function POST(req: NextRequest) {
   const accessToken = signToken(user.id);
   const refreshToken = accessToken;
 
-  const userWithRoles = await User.findOne({
-    where: { id: user.id },
-    include: [{ model: Role, as: 'roles' }],
-  });
+  const userWithRoles = await getUserWithRoles(user.id);
 
   return NextResponse.json({
     success: true,

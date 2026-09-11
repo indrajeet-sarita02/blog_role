@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Permission } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,10 +14,14 @@ export async function GET(req: NextRequest) {
   const where: Record<string, unknown> = {};
   if (module) where.module = module;
 
-  const { count, rows } = await Permission.findAndCountAll({ where, limit, offset: (page - 1) * limit, order: [['module', 'ASC'], ['id', 'ASC']] });
+  const total = await prisma.permission.count({ where });
+  const rows = await prisma.permission.findMany({
+    where, take: limit, skip: (page - 1) * limit,
+    orderBy: [{ module: 'asc' }, { id: 'asc' }],
+  });
 
   return NextResponse.json({
     success: true, message: 'Permissions fetched', data: rows,
-    meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 }

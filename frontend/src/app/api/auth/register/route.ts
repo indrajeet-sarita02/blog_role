@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, User, Role, UserRole } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { getUserWithRoles } from '@/database/shapes';
 import bcrypt from 'bcrypt';
 import { signToken } from '@/lib/auth/server';
 
@@ -15,24 +16,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'Name, email and password are required' }, { status: 400 });
   }
 
-  const existing = await User.findOne({ where: { email } });
+  const existing = await prisma.user.findFirst({ where: { email } });
   if (existing) {
     return NextResponse.json({ success: false, message: 'Email already registered' }, { status: 409 });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, passwordHash, avatar: null, bio: null, status: 'active' });
+  const user = await prisma.user.create({ data: { name, email, passwordHash, avatar: null, bio: null, status: 'active' } });
 
-  const userRole = await Role.findOne({ where: { slug: 'user' } });
+  const userRole = await prisma.role.findFirst({ where: { slug: 'user' } });
   if (userRole) {
-    await UserRole.create({ userId: user.id, roleId: userRole.id });
+    await prisma.userRole.create({ data: { userId: user.id, roleId: userRole.id } });
   }
 
   const accessToken = signToken(user.id);
-  const userWithRoles = await User.findOne({
-    where: { id: user.id },
-    include: [{ model: Role, as: 'roles' }],
-  });
+  const userWithRoles = await getUserWithRoles(user.id);
 
   return NextResponse.json({
     success: true,

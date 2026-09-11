@@ -1,39 +1,24 @@
-import { Sequelize } from 'sequelize';
-import path from 'path';
+import { prisma } from '@/database/prisma';
+import { ensureSchema } from '@/database/schema';
 
-const DB_PATH = path.join(process.cwd(), 'database.sqlite');
+export { prisma } from '@/database/prisma';
+export { ensureSchema } from '@/database/schema';
 
-export const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: DB_PATH,
-  logging: false,
-  define: {
-    underscored: true,
-  },
-});
+const g = globalThis as unknown as { __blogDbReady?: boolean };
 
-const g = globalThis as unknown as { __blogDbInitialized?: boolean };
+export async function ensureDb(): Promise<void> {
+  if (g.__blogDbReady) return;
 
-export async function initDatabase() {
-  if (g.__blogDbInitialized) return;
-  g.__blogDbInitialized = true;
+  await ensureSchema();
+  await ensureSeeded();
 
-  // Import all models so they register with sequelize
-  await import('@/database/models/User');
-  await import('@/database/models/Role');
-  await import('@/database/models/Permission');
-  await import('@/database/models/UserRole');
-  await import('@/database/models/RolePermission');
-  await import('@/database/models/Category');
-  await import('@/database/models/Tag');
-  await import('@/database/models/Post');
-  await import('@/database/models/PostTag');
-  await import('@/database/models/PostRevision');
-  await import('@/database/models/Comment');
-  await import('@/database/models/Media');
-  await import('@/database/models/AuditLog');
-  await import('@/database/models/Notification');
-  await import('@/database/models/Setting');
+  g.__blogDbReady = true;
+}
 
-  await sequelize.sync();
+async function ensureSeeded(): Promise<void> {
+  const count = await prisma.user.count();
+  if (count > 0) return;
+
+  const { seedDatabase } = await import('@/database/seed');
+  await seedDatabase();
 }

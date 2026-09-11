@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Role, Permission, RolePermission } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { attachPermissions } from '@/database/shapes';
 import { slugify } from '@/lib/utils/slug';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const include = [{ model: Permission, as: 'permissions' }];
 
 export async function GET(req: NextRequest) {
   await ensureDb();
   const params = req.nextUrl.searchParams;
   const page = parseInt(params.get('page') || '1');
   const limit = Math.min(parseInt(params.get('limit') || '20'), 100);
-  const { count, rows } = await Role.findAndCountAll({ include, limit, offset: (page - 1) * limit, order: [['createdAt', 'DESC']] });
+  const total = await prisma.role.count();
+  const rows = await prisma.role.findMany({
+    take: limit, skip: (page - 1) * limit,
+    orderBy: { createdAt: 'desc' },
+  });
+  const data = await Promise.all(rows.map(attachPermissions));
   return NextResponse.json({
-    success: true, message: 'Roles fetched', data: rows,
-    meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
+    success: true, message: 'Roles fetched', data,
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 }
 
@@ -26,10 +30,12 @@ export async function POST(req: NextRequest) {
   if (!name || !slug) {
     return NextResponse.json({ success: false, message: 'Name and slug are required' }, { status: 400 });
   }
-  const existing = await Role.findOne({ where: { slug } });
+  const existing = await prisma.role.findFirst({ where: { slug } });
   if (existing) {
     return NextResponse.json({ success: false, message: 'Role slug already exists' }, { status: 409 });
   }
-  const role = await Role.create({ name, slug, description: description || null, isSystem: false });
+  const role = await prisma.role.create({
+    data: { name, slug, description: description || null, isSystem: false },
+  });
   return NextResponse.json({ success: true, message: 'Role created', data: role }, { status: 201 });
 }

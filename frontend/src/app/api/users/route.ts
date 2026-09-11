@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, User, Role, UserRole, sequelize } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
+import { attachRoles } from '@/database/shapes';
 import bcrypt from 'bcrypt';
 import { getUserIdFromRequest } from '@/lib/auth/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const include = [{ model: Role, as: 'roles' }];
 
 export async function GET(req: NextRequest) {
   await ensureDb();
@@ -20,24 +19,30 @@ export async function GET(req: NextRequest) {
   if (status) where.status = status;
   if (search) {
     const s = search.toLowerCase();
-    // Filter in memory for simplicity
-    const users = await User.findAll({ include });
+    const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
     const filtered = users.filter((u) => u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
     const total = filtered.length;
     const start = (page - 1) * limit;
+    const paged = filtered.slice(start, start + limit);
+    const data = await Promise.all(paged.map(attachRoles));
     return NextResponse.json({
       success: true, message: 'Users fetched',
-      data: filtered.slice(start, start + limit),
+      data,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   }
 
-  const { count, rows } = await User.findAndCountAll({ where, include, limit, offset: (page - 1) * limit, order: [['createdAt', 'DESC']] });
+  const total = await prisma.user.count({ where });
+  const rows = await prisma.user.findMany({
+    where, take: limit, skip: (page - 1) * limit,
+    orderBy: { createdAt: 'desc' },
+  });
+  const data = await Promise.all(rows.map(attachRoles));
 
   return NextResponse.json({
     success: true, message: 'Users fetched',
-    data: rows,
-    meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
+    data,
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 }
 
@@ -50,31 +55,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'Name, email and password are required' }, { status: 400 });
   }
 
-  return sequelize.transaction(async (t) => {
-    const existing = await User.findOne({ where: { email }, transaction: t });
+  try {
+    const existing = await prisma.user.findFirst({ where: { email } });
     if (existing) {
-      throw { status: 409, message: 'Email already in use' };
+      return NextResponse.json({ success: false, message: 'Email already in use' }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, passwordHash, avatar: null, bio: null, status: 'active' }, { transaction: t });
+    const user = await prisma.user.create({
+      data: { name, email, passwordHash, avatar: null, bio: null, status: 'active' },
+    });
 
     let assignedRoleIds = roleIds;
     if (!assignedRoleIds || !assignedRoleIds.length) {
-      const userRole = await Role.findOne({ where: { slug: 'user' }, transaction: t });
+      const userRole = await prisma.role.findFirst({ where: { slug: 'user' } });
       assignedRoleIds = userRole ? [userRole.id] : [];
     }
     if (assignedRoleIds.length) {
-      await UserRole.bulkCreate(assignedRoleIds.map((rid: number) => ({ userId: user.id, roleId: rid })), { transaction: t });
+      await prisma.userRole.createMany({
+        data: assignedRoleIds.map((rid: number) => ({ userId: user.id, roleId: rid })),
+      });
     }
 
-    return user;
-  }).then((user) =>
-    User.findOne({ where: { id: user.id }, include }).then((full) =>
-      NextResponse.json({ success: true, message: 'User created', data: full }, { status: 201 }),
-    ),
-  ).catch((err) => {
+    const full = await prisma.user.findUnique({ where: { id: user.id } });
+    const data = await attachRoles(full!);
+    return NextResponse.json({ success: true, message: 'User created', data }, { status: 201 });
+  } catch (err: any) {
     if (err?.status) return NextResponse.json({ success: false, message: err.message }, { status: err.status });
     return NextResponse.json({ success: false, message: 'Failed to create user' }, { status: 500 });
-  });
+  }
 }

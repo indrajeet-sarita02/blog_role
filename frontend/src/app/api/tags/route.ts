@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDb, Tag } from '@/database/seeders';
+import { prisma, ensureDb } from '@/database';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   if (search) {
     const s = search.toLowerCase();
-    const all = await Tag.findAll();
+    const all = await prisma.tag.findMany({ orderBy: { name: 'asc' } });
     const filtered = all.filter((t) => t.name.toLowerCase().includes(s));
     return NextResponse.json({
       success: true, message: 'Tags fetched', data: filtered,
@@ -21,10 +21,14 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const { count, rows } = await Tag.findAndCountAll({ limit, offset: (page - 1) * limit, order: [['name', 'ASC']] });
+  const total = await prisma.tag.count();
+  const rows = await prisma.tag.findMany({
+    take: limit, skip: (page - 1) * limit,
+    orderBy: { name: 'asc' },
+  });
   return NextResponse.json({
     success: true, message: 'Tags fetched', data: rows,
-    meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 }
 
@@ -36,10 +40,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'Name is required' }, { status: 400 });
   }
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const existing = await Tag.findOne({ where: { slug } });
+  const existing = await prisma.tag.findFirst({ where: { slug } });
   if (existing) {
     return NextResponse.json({ success: false, message: 'Tag slug already exists' }, { status: 409 });
   }
-  const tag = await Tag.create({ name, slug });
+  const tag = await prisma.tag.create({ data: { name, slug } });
   return NextResponse.json({ success: true, message: 'Tag created', data: tag }, { status: 201 });
 }
