@@ -1,21 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    serverComponentsExternalPackages: [
-      'sequelize',
-      'sqlite3',
-      'pg-hstore',
-      'mysql2',
-      'pg',
-      'pg-native',
-      'tedious',
-      'oracledb',
-      'better-sqlite3',
-      '@prisma/client',
-      '@prisma/extension-accelerate',
-      'bcrypt',
-    ],
+  async rewrites() {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    const backendOrigin = new URL(backendUrl).origin;
+
+    return [
+      {
+        source: '/uploads/:path*',
+        destination: `${backendOrigin}/uploads/:path*`,
+      },
+    ];
   },
 };
 

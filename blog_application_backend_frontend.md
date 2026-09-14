@@ -28,17 +28,14 @@ The application supports multiple user types with configurable roles and permiss
 
 ### Backend
 
-- Node.js
-- TypeScript
-- Express.js
-- MySQL
-- Sequelize ORM
-- JWT authentication
-- bcrypt/bcryptjs for password hashing
-- Zod or Joi for validation
-- Helmet
+- FastAPI (Python)
+- SQLite (development) / MySQL (production)
+- SQLAlchemy ORM
+- Pydantic for validation
+- JWT authentication (PyJWT)
+- bcrypt for password hashing
 - CORS
-- Morgan/Pino/Winston for logging
+- Uvicorn ASGI server
 
 ### Frontend
 
@@ -76,7 +73,7 @@ The application supports multiple user types with configurable roles and permiss
                                     │ HTTPS
                                     ▼
                          ┌──────────────────────┐
-                         │      Express API     │
+                         │      FastAPI         │
                          │       Backend        │
                          └──────────┬───────────┘
                                     │
@@ -90,8 +87,8 @@ The application supports multiple user types with configurable roles and permiss
                └────────────────────┼────────────────────┘
                                     ▼
                               ┌─────────────┐
-                              │   MySQL     │
-                              │  Database   │
+                              │   SQLite    │
+                              │  / MySQL    │
                               └─────────────┘
 ```
 
@@ -283,61 +280,66 @@ Settings
 
 ```text
 backend/
-├── src/
-│   ├── config/
-│   │   ├── database.ts
-│   │   ├── env.ts
-│   │   └── constants.ts
+├── app/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── database.py
+│   ├── deps.py
+│   ├── main.py
+│   ├── models.py
+│   ├── schemas.py
+│   ├── seed.py
 │   │
-│   ├── database/
-│   │   ├── models/
-│   │   ├── migrations/
-│   │   └── seeders/
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── router.py
+│   │   ├── auth.py
+│   │   ├── users.py
+│   │   ├── roles.py
+│   │   ├── permissions.py
+│   │   ├── posts.py
+│   │   ├── categories.py
+│   │   ├── tags.py
+│   │   ├── comments.py
+│   │   ├── post_comments.py
+│   │   ├── media.py
+│   │   ├── notifications.py
+│   │   ├── audit.py
+│   │   ├── settings.py
+│   │   └── public.py
 │   │
-│   ├── modules/
-│   │   ├── auth/
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── auth.service.ts
-│   │   │   ├── auth.routes.ts
-│   │   │   ├── auth.validation.ts
-│   │   │   └── auth.types.ts
-│   │   │
-│   │   ├── users/
-│   │   ├── roles/
-│   │   ├── permissions/
-│   │   ├── posts/
-│   │   ├── categories/
-│   │   ├── tags/
-│   │   ├── comments/
-│   │   ├── media/
-│   │   ├── notifications/
-│   │   └── audit/
+│   ├── core/
+│   │   ├── audit.py
+│   │   ├── context.py
+│   │   ├── errors.py
+│   │   ├── pagination.py
+│   │   ├── permissions.py
+│   │   ├── rate_limit.py
+│   │   ├── responses.py
+│   │   ├── sanitize.py
+│   │   ├── security.py
+│   │   └── slug.py
 │   │
-│   ├── middleware/
-│   │   ├── auth.middleware.ts
-│   │   ├── permission.middleware.ts
-│   │   ├── ownership.middleware.ts
-│   │   ├── validation.middleware.ts
-│   │   ├── error.middleware.ts
-│   │   └── rate-limit.middleware.ts
-│   │
-│   ├── utils/
-│   │   ├── jwt.ts
-│   │   ├── password.ts
-│   │   ├── slug.ts
-│   │   ├── pagination.ts
-│   │   └── response.ts
-│   │
-│   ├── routes/
-│   │   └── index.ts
-│   │
-│   ├── app.ts
-│   └── server.ts
+│   └── services/
+│       ├── auth_service.py
+│       ├── user_service.py
+│       ├── role_service.py
+│       ├── permission_service.py
+│       ├── post_service.py
+│       ├── category_service.py
+│       ├── tag_service.py
+│       ├── comment_service.py
+│       ├── media_service.py
+│       ├── notification_service.py
+│       ├── audit_service.py
+│       ├── settings_service.py
+│       └── public_service.py
 │
-├── tests/
+├── .env
 ├── .env.example
-├── package.json
-└── tsconfig.json
+├── requirements.txt
+├── database.sqlite
+└── .venv/
 ```
 
 ---
@@ -1135,27 +1137,27 @@ Permission Check
   ↓
 Ownership Check
   ↓
-Validation
+Validation (Pydantic)
   ↓
-Controller
+Route / Dependency
   ↓
 Service
   ↓
-Repository/ORM
+SQLAlchemy ORM
   ↓
 Database
 ```
 
-Business rules belong primarily in services, not controllers.
+Business rules belong primarily in services, not routers.
 
 ---
 
-# 38. Controller / Service Responsibility
+# 38. Route / Service Responsibility
 
 Bad:
 
 ```text
-Controller:
+Route handler:
 - Validate everything
 - Query database
 - Apply business rules
@@ -1166,27 +1168,27 @@ Controller:
 Better:
 
 ```text
-Controller
+Route handler
    ↓
-Validation
+Pydantic validation
    ↓
 Service
    ↓
-Model/Repository
+SQLAlchemy Model
    ↓
 Database
 ```
 
-Controller should remain thin.
+Route handlers should remain thin.
 
 Example:
 
 ```text
-post.controller.ts
-    ↓
-post.service.ts
-    ↓
-Post model
+app/api/posts.py  (router)
+        ↓
+app/services/post_service.py
+        ↓
+Post model (SQLAlchemy)
 ```
 
 ---
@@ -1355,7 +1357,7 @@ Admin/user listing should support:
 Example:
 
 ```text
-Search: "Node.js"
+Search: "Python"
 
 Status: Published
 
@@ -1439,7 +1441,7 @@ Recommended query parameters:
 ```text
 ?page=1
 &limit=20
-&search=node
+&search=python
 &sort=created_at
 &order=desc
 ```
@@ -1464,12 +1466,12 @@ The backend must implement:
 
 - Password hashing
 - Input validation
-- SQL injection protection through Sequelize parameterization
+- SQL injection protection through SQLAlchemy parameterization
 - XSS protection
 - CSRF strategy where applicable
 - CORS restrictions
 - Rate limiting
-- Helmet/security headers
+- Security headers
 - Secure cookies if cookies are used
 - JWT expiration
 - Refresh-token revocation
@@ -1610,15 +1612,9 @@ sensitive secrets
 Example `.env.example`:
 
 ```env
-NODE_ENV=development
-
 PORT=5000
 
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=blog_db
-DB_USER=root
-DB_PASSWORD=
+DB_STORAGE=./database.sqlite
 
 JWT_ACCESS_SECRET=
 JWT_REFRESH_SECRET=
@@ -1626,7 +1622,12 @@ JWT_REFRESH_SECRET=
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
+SUPER_ADMIN_EMAIL=admin@example.com
+SUPER_ADMIN_PASSWORD=admin123
+
 FRONTEND_URL=http://localhost:3000
+UPLOAD_DIR=uploads
+MAX_UPLOAD_SIZE_MB=10
 ```
 
 Never commit the real `.env` file.
@@ -1635,12 +1636,12 @@ Never commit the real `.env` file.
 
 # 55. Database Migration Strategy
 
-Use Sequelize migrations.
+Use SQLAlchemy metadata/DDL or Alembic for schema management.
 
 Do not depend on:
 
 ```text
-sequelize.sync({ alter: true })
+SQLAlchemy Base.metadata.create_all()
 ```
 
 for production schema management.
@@ -1657,7 +1658,7 @@ test
 deploy
 ```
 
-Every schema change should have a migration.
+Every schema change should have a migration (Alembic) in production.
 
 ---
 
@@ -1794,10 +1795,10 @@ Expected: 403
 ## Phase 1 — Foundation
 
 - Repository setup
-- TypeScript
-- Express
-- MySQL
-- Sequelize
+- Python
+- FastAPI
+- SQLite (development) / MySQL (production)
+- SQLAlchemy
 - Environment configuration
 - Error handling
 - Logging
@@ -1892,7 +1893,7 @@ The actual coding order should be:
 ```text
 1. Database schema
         ↓
-2. Sequelize models
+2. SQLAlchemy models
         ↓
 3. Migrations
         ↓
@@ -1956,8 +1957,6 @@ Validation
    ✓
 Service
    ✓
-Controller
-   ✓
 Route
    ✓
 Authorization
@@ -1989,7 +1988,7 @@ Permission-based UI
 The project should follow these principles:
 
 1. Backend is the source of truth for authorization.
-2. Controllers remain thin.
+2. Route handlers remain thin.
 3. Business logic belongs in services.
 4. Database changes are managed through migrations.
 5. Roles are collections of permissions.
@@ -2050,7 +2049,7 @@ These should be added only when business requirements justify them.
                            │
                          HTTPS
                            │
-                    EXPRESS + TS
+                      FASTAPI
                            │
           ┌────────────────┼────────────────┐
           │                │                │
@@ -2060,9 +2059,9 @@ These should be added only when business requirements justify them.
           │                │                │
           └────────────────┼────────────────┘
                            │
-                      SEQUELIZE
+                       SQLALCHEMY
                            │
-                         MYSQL
+                    SQLITE / MYSQL
                            │
                  ┌─────────┴─────────┐
                  │                   │

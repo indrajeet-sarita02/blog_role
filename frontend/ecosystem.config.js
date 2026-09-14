@@ -8,10 +8,7 @@ module.exports = {
       interpreter: 'node',
       env: {
         NODE_ENV: 'production',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        JWT_SECRET: 'change-me-to-a-long-random-string',
+        NEXT_PUBLIC_API_URL: 'http://localhost:5000/api/v1',
       },
       max_memory_restart: '500M',
       instances: 1,

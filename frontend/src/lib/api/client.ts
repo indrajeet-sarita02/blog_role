@@ -1,8 +1,18 @@
 import { getAccessToken } from '@/lib/auth/tokens';
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+
 export function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return 'Something went wrong';
+}
+
+function buildUrl(path: string): string {
+  if (path.startsWith('/api/')) {
+    return `${API_BASE}${path.slice(4)}`;
+  }
+  return path;
 }
 
 interface RequestOptions {
@@ -22,7 +32,7 @@ export async function apiRequest<T = any>(
 
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(buildUrl(path), {
       method: options.method || 'GET',
       headers,
       body: options.isFormData
