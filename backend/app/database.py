@@ -19,3 +19,30 @@ def init_db():
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _seed_if_empty()
+
+
+def _seed_if_empty():
+    import os
+
+    try:
+        from app.config import IS_SERVERLESS
+        if not IS_SERVERLESS and os.path.exists('database.seeded'):
+            return
+    except Exception:
+        pass
+
+    try:
+        from app.models import Permission
+        from sqlalchemy.orm import Session
+
+        session = Session(bind=engine)
+        try:
+            if session.query(Permission).count() == 0:
+                from app.seed import seed
+
+                seed()
+        finally:
+            session.close()
+    except Exception:
+        pass

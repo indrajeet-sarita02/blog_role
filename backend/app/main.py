@@ -38,8 +38,13 @@ def create_app():
 
     upload_dir = os.path.join(os.getcwd(), UPLOAD_DIR)
     if not os.path.isdir(upload_dir):
-        os.makedirs(upload_dir, exist_ok=True)
-    app.mount('/uploads', StaticFiles(directory=upload_dir), name='uploads')
+        try:
+            os.makedirs(upload_dir, exist_ok=True)
+        except OSError:
+            upload_dir = os.path.join('/tmp', UPLOAD_DIR)
+            os.makedirs(upload_dir, exist_ok=True)
+    if os.path.isdir(upload_dir):
+        app.mount('/uploads', StaticFiles(directory=upload_dir), name='uploads')
 
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError):

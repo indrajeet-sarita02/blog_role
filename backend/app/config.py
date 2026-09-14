@@ -39,8 +39,10 @@ def _parse_expiry(value):
 
 _load_dotenv()
 
+IS_SERVERLESS = bool(os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV'))
+
 PORT = int(os.environ.get('PORT', '5000'))
-DB_STORAGE = os.environ.get('DB_STORAGE', './database.sqlite')
+DB_STORAGE = os.environ.get('DB_STORAGE', '/tmp/database.sqlite' if IS_SERVERLESS else './database.sqlite')
 NODE_ENV = os.environ.get('NODE_ENV', 'development')
 
 JWT_ACCESS_SECRET = os.environ.get('JWT_ACCESS_SECRET', 'access_secret')
@@ -55,7 +57,7 @@ SUPER_ADMIN_PASSWORD = os.environ.get('SUPER_ADMIN_PASSWORD')
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
-UPLOAD_DIR = os.environ.get('UPLOAD_DIR', 'uploads')
+UPLOAD_DIR = os.environ.get('UPLOAD_DIR', '/tmp/uploads' if IS_SERVERLESS else 'uploads')
 MAX_UPLOAD_SIZE_MB = int(os.environ.get('MAX_UPLOAD_SIZE_MB', '10'))
 MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
