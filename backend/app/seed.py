@@ -1,12 +1,13 @@
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.getcwd())
 
 from app.config import SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD
 from app.core.security import hash_password
 from app.database import Base, SessionLocal, engine
-from app.models import Permission, Role, RolePermission, User, UserRole
+from app.models import Category, Permission, Post, PostTag, Role, RolePermission, Tag, User, UserRole
 
 PERMISSIONS = [
     {'name': 'Create Blog', 'slug': 'blog.create', 'module': 'blog'},
@@ -121,6 +122,127 @@ ROLE_DEFINITIONS = {
 }
 
 
+DEFAULT_ADMIN_EMAIL = 'admin@example.com'
+DEFAULT_ADMIN_PASSWORD = 'admin123'
+
+SAMPLE_USERS = [
+    {'name': 'Alice Johnson', 'email': 'alice@example.com', 'password': 'password123', 'role': 'author'},
+    {'name': 'Bob Smith', 'email': 'bob@example.com', 'password': 'password123', 'role': 'editor'},
+    {'name': 'Carol White', 'email': 'carol@example.com', 'password': 'password123', 'role': 'admin'},
+    {'name': 'Dave Brown', 'email': 'dave@example.com', 'password': 'password123', 'role': 'user'},
+]
+
+SAMPLE_CATEGORIES = [
+    {'name': 'Technology', 'slug': 'technology', 'description': 'Software, hardware, and tech news'},
+    {'name': 'Lifestyle', 'slug': 'lifestyle', 'description': 'Everyday living and personal growth'},
+    {'name': 'Health', 'slug': 'health', 'description': 'Fitness, wellness, and healthy habits'},
+    {'name': 'Travel', 'slug': 'travel', 'description': 'Destinations, guides, and travel tips'},
+    {'name': 'Food', 'slug': 'food', 'description': 'Recipes, cooking, and food culture'},
+]
+
+SAMPLE_TAGS = [
+    'fastapi', 'python', 'vercel', 'nextjs', 'react',
+    'web-development', 'tutorial', 'api', 'database', 'security',
+]
+
+SAMPLE_POSTS = [
+    {
+        'title': 'Building a Serverless API with FastAPI on Vercel',
+        'slug': 'serverless-api-fastapi-vercel',
+        'excerpt': 'Learn how to deploy a FastAPI application as a serverless function on Vercel.',
+        'content': (
+            '<p>FastAPI is a modern, fast web framework for building APIs with Python. '
+            'In this tutorial, we walk through deploying a FastAPI app on Vercel using the '
+            'Python runtime and uv for dependency management.</p>'
+            '<p>We cover project structure, environment variables, and the vercel.json '
+            'configuration that routes all traffic to the ASGI entrypoint.</p>'
+        ),
+        'status': 'published',
+        'category': 'technology',
+        'author': 'alice@example.com',
+        'tags': ['fastapi', 'python', 'vercel', 'api', 'tutorial'],
+    },
+    {
+        'title': 'Deploying Next.js with Tailwind CSS and TypeScript',
+        'slug': 'deploy-nextjs-tailwind-typescript',
+        'excerpt': 'A step-by-step guide to shipping a modern Next.js blog with Tailwind.',
+        'content': (
+            '<p>Next.js gives you the best of server-side rendering and static generation. '
+            'Combine it with Tailwind CSS and TypeScript for a delightful development experience.</p>'
+            '<p>In this guide we go over app router structure, API route proxying, and CI '
+            'deployment through Vercel.</p>'
+        ),
+        'status': 'published',
+        'category': 'technology',
+        'author': 'bob@example.com',
+        'tags': ['nextjs', 'react', 'web-development', 'tutorial'],
+    },
+    {
+        'title': '10 Tips for a Healthier Morning Routine',
+        'slug': 'healthier-morning-routine',
+        'excerpt': 'Small changes to start your day with more energy and focus.',
+        'content': (
+            '<p>Your morning routine sets the tone for the entire day. We share ten practical '
+            'habits backed by research to improve sleep, hydration, and focus.</p>'
+            '<p>Start small, be consistent, and give yourself time to adapt a routine that works '
+            'for you.</p>'
+        ),
+        'status': 'published',
+        'category': 'health',
+        'author': 'carol@example.com',
+        'tags': ['tutorial'],
+    },
+    {
+        'title': 'A Weekend Guide to the Himalayas',
+        'slug': 'weekend-himalayas-guide',
+        'excerpt': 'Short trek itineraries, packing lists, and safety tips for the mountains.',
+        'content': (
+            '<p>The Himalayas offer some of the most spectacular short treks in the world. '
+            'This weekend guide covers route planning, acclimatization, and essential gear.</p>'
+            '<p>Always check weather conditions and hire a local guide when in doubt.</p>'
+        ),
+        'status': 'published',
+        'category': 'travel',
+        'author': 'dave@example.com',
+        'tags': [],
+    },
+    {
+        'title': "Beginner's Guide to SQLAlchemy ORM",
+        'slug': 'sqlalchemy-orm-beginners-guide',
+        'excerpt': 'Models, relationships, and sessions explained for newcomers.',
+        'content': (
+            '<p>SQLAlchemy is the most popular SQL toolkit for Python. This guide introduces '
+            'declarative models, relationships, and the session lifecycle with clear examples.</p>'
+            '<p>By the end, you will understand how to map your application tables to Python '
+            'classes and query them safely.</p>'
+        ),
+        'status': 'published',
+        'category': 'technology',
+        'author': 'alice@example.com',
+        'tags': ['python', 'database', 'tutorial'],
+    },
+]
+
+
+def _ensure_role(db, role_map, email, role_slug, password, name):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = User(
+            name=name,
+            email=email,
+            passwordHash=hash_password(password),
+            status='active',
+        )
+        db.add(user)
+        db.flush()
+    assignment = db.query(UserRole).filter(
+        UserRole.userId == user.id, UserRole.roleId == role_map[role_slug].id,
+    ).first()
+    if not assignment:
+        db.add(UserRole(userId=user.id, roleId=role_map[role_slug].id))
+    return user
+
+
 def seed():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
@@ -150,26 +272,79 @@ def seed():
             db.commit()
         print('Seeded {} roles'.format(len(ROLE_DEFINITIONS)))
 
-        if SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD:
-            admin = db.query(User).filter(User.email == SUPER_ADMIN_EMAIL).first()
-            if not admin:
-                admin = User(
-                    name='Super Admin',
-                    email=SUPER_ADMIN_EMAIL,
-                    passwordHash=hash_password(SUPER_ADMIN_PASSWORD),
-                    status='active',
-                )
-                db.add(admin)
+        admin_email = SUPER_ADMIN_EMAIL or DEFAULT_ADMIN_EMAIL
+        admin_password = SUPER_ADMIN_PASSWORD or DEFAULT_ADMIN_PASSWORD
+        admin = db.query(User).filter(User.email == admin_email).first()
+        if not admin:
+            admin = User(
+                name='Super Admin',
+                email=admin_email,
+                passwordHash=hash_password(admin_password),
+                status='active',
+            )
+            db.add(admin)
+            db.flush()
+        existing_assignment = db.query(UserRole).filter(
+            UserRole.userId == admin.id, UserRole.roleId == role_map['super-admin'].id,
+        ).first()
+        if not existing_assignment:
+            db.add(UserRole(userId=admin.id, roleId=role_map['super-admin'].id))
+        db.commit()
+        print('Super admin ensured: {}'.format(admin_email))
+
+        users_by_email = {admin_email: admin}
+        for sample in SAMPLE_USERS:
+            sample_user = _ensure_role(
+                db, role_map, sample['email'], sample['role'], sample['password'], sample['name'],
+            )
+            users_by_email[sample['email']] = sample_user
+        db.commit()
+        print('Seeded {} sample users'.format(len(SAMPLE_USERS)))
+
+        category_map = {}
+        for cat in SAMPLE_CATEGORIES:
+            existing = db.query(Category).filter(Category.slug == cat['slug']).first()
+            if not existing:
+                existing = Category(name=cat['name'], slug=cat['slug'], description=cat['description'], status='active')
+                db.add(existing)
                 db.flush()
-            existing_assignment = db.query(UserRole).filter(
-                UserRole.userId == admin.id, UserRole.roleId == role_map['super-admin'].id,
-            ).first()
-            if not existing_assignment:
-                db.add(UserRole(userId=admin.id, roleId=role_map['super-admin'].id))
-            db.commit()
-            print('Super admin ensured: {}'.format(SUPER_ADMIN_EMAIL))
-        else:
-            print('SUPER_ADMIN_EMAIL/PASSWORD not set - skipping super admin creation')
+            category_map[cat['slug']] = existing
+        db.commit()
+        print('Seeded {} categories'.format(len(SAMPLE_CATEGORIES)))
+
+        tag_map = {}
+        for tag_name in SAMPLE_TAGS:
+            existing = db.query(Tag).filter(Tag.slug == tag_name).first()
+            if not existing:
+                existing = Tag(name=tag_name, slug=tag_name)
+                db.add(existing)
+                db.flush()
+            tag_map[tag_name] = existing
+        db.commit()
+        print('Seeded {} tags'.format(len(SAMPLE_TAGS)))
+
+        post_count = 0
+        for post_data in SAMPLE_POSTS:
+            if db.query(Post).filter(Post.slug == post_data['slug']).first():
+                continue
+            post = Post(
+                authorId=users_by_email[post_data['author']].id,
+                categoryId=category_map[post_data['category']].id,
+                title=post_data['title'],
+                slug=post_data['slug'],
+                excerpt=post_data['excerpt'],
+                content=post_data['content'],
+                status=post_data['status'],
+                visibility='public',
+                publishedAt=datetime.utcnow(),
+            )
+            db.add(post)
+            db.flush()
+            for tag_name in post_data['tags']:
+                db.add(PostTag(postId=post.id, tagId=tag_map[tag_name].id))
+            post_count += 1
+        db.commit()
+        print('Seeded {} posts'.format(post_count))
 
         print('Seed complete')
     finally:
