@@ -8,7 +8,7 @@ from app.deps import get_db, require_permission
 from app.schemas import AuditData
 from app.services import audit_service
 
-router = APIRouter()
+router = APIRouter(tags=['Audit Logs'])
 
 
 def _query(page, limit, action, module, user_id, search, sort, order):

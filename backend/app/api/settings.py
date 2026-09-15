@@ -7,7 +7,7 @@ from app.core.context import capture
 from app.deps import get_current_user, get_db, require_permission
 from app.services import settings_service
 
-router = APIRouter()
+router = APIRouter(tags=['Settings'])
 
 
 @router.get('', status_code=200)

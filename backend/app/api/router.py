@@ -25,7 +25,7 @@ def _health():
     return responses.ok({'status': 'up'}, 'OK')
 
 
-api_router.add_api_route('/health', _health, methods=['GET'])
+api_router.add_api_route('/health', _health, methods=['GET'], tags=['Meta'])
 
 api_router.include_router(auth.router, prefix='/auth')
 api_router.include_router(users.router, prefix='/users')

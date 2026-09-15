@@ -9,7 +9,7 @@ from app.deps import get_current_user, get_db, require_permission
 from app.schemas import MediaData
 from app.services import media_service
 
-router = APIRouter()
+router = APIRouter(tags=['Media'])
 
 
 class UpdateMediaBody(BaseModel):

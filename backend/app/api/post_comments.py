@@ -19,7 +19,7 @@ class UpdateCommentBody(BaseModel):
     content: str
 
 
-router = APIRouter()
+router = APIRouter(tags=['Post Comments'])
 
 
 def _list_filters(page, limit, status, search, sort, order):

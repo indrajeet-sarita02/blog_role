@@ -25,7 +25,7 @@ class UpdateRolePermissionsBody(BaseModel):
     permissionIds: List[int]
 
 
-router = APIRouter()
+router = APIRouter(tags=['Roles'])
 
 
 def _query(page, limit, search, sort, order):

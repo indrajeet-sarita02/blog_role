@@ -24,7 +24,33 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 def create_app():
     init_db()
-    app = FastAPI(title='Blog API', docs_url='/docs', redoc_url='/redoc')
+    app = FastAPI(
+        title='Blog API',
+        description='REST API for the blog application. All endpoints are documented with '
+        'Swagger UI (/docs) and ReDoc (/redoc). Interactive requests can be run directly '
+        'from the Swagger UI.',
+        version='1.0.0',
+        docs_url='/docs',
+        redoc_url='/redoc',
+        openapi_url='/openapi.json',
+        openapi_tags=[
+            {'name': 'Auth', 'description': 'Registration, login, refresh tokens and logout'},
+            {'name': 'Users', 'description': 'Manage blog users and their status'},
+            {'name': 'Roles', 'description': 'Manage user roles'},
+            {'name': 'Permissions', 'description': 'List and manage permissions'},
+            {'name': 'Categories', 'description': 'Manage post categories'},
+            {'name': 'Tags', 'description': 'Manage post tags'},
+            {'name': 'Posts', 'description': 'Manage blog posts and revisions'},
+            {'name': 'Post Comments', 'description': 'Create and manage comments on a specific post'},
+            {'name': 'Comments', 'description': 'Moderate comments across all posts'},
+            {'name': 'Public', 'description': 'Public read-only content endpoints'},
+            {'name': 'Media', 'description': 'Upload and manage media files'},
+            {'name': 'Audit Logs', 'description': 'Audit trail of actions'},
+            {'name': 'Notifications', 'description': 'User notifications'},
+            {'name': 'Settings', 'description': 'App settings'},
+            {'name': 'Meta', 'description': 'Health and metadata endpoints'},
+        ],
+    )
 
     app.add_middleware(RateLimitMiddleware)
 

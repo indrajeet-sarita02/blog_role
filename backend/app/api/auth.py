@@ -23,7 +23,7 @@ class RefreshBody(BaseModel):
     refreshToken: str
 
 
-router = APIRouter()
+router = APIRouter(tags=['Auth'])
 
 
 def _auth_reply(result, message, status_code=200):

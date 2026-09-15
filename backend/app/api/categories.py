@@ -25,7 +25,7 @@ class UpdateCategoryBody(BaseModel):
     status: Optional[str] = None
 
 
-router = APIRouter()
+router = APIRouter(tags=['Categories'])
 
 
 def _query(page, limit, search, status, sort, order):

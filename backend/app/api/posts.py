@@ -34,7 +34,7 @@ class UpdatePostBody(BaseModel):
     visibility: Optional[str] = None
 
 
-router = APIRouter()
+router = APIRouter(tags=['Posts'])
 
 
 def _filters(page, limit, search, status, category_id, author_id, sort, order):

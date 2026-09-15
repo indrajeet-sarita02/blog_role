@@ -8,7 +8,7 @@ from app.deps import get_current_user, get_db
 from app.schemas import NotificationData
 from app.services import notification_service
 
-router = APIRouter()
+router = APIRouter(tags=['Notifications'])
 
 
 def _query(page, limit, unread, type_, sort, order):

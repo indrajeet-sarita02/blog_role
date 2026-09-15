@@ -19,7 +19,7 @@ class UpdateTagBody(BaseModel):
     name: Optional[str] = None
 
 
-router = APIRouter()
+router = APIRouter(tags=['Tags'])
 
 
 def _query(page, limit, search, sort, order):

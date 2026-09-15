@@ -32,7 +32,7 @@ class UpdateRolesBody(BaseModel):
     roleIds: List[int]
 
 
-router = APIRouter()
+router = APIRouter(tags=['Users'])
 
 
 def _query(page, limit, search, status, sort, order):

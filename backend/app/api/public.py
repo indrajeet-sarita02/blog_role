@@ -8,7 +8,7 @@ from app.deps import get_db
 from app.schemas import CategoryFull, PostData, TagData
 from app.services import public_service
 
-router = APIRouter()
+router = APIRouter(tags=['Public'])
 
 
 def _query(page, limit, search, category, tag, sort, order):

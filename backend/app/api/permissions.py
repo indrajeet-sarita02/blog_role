@@ -8,7 +8,7 @@ from app.deps import get_db, require_permission
 from app.schemas import PermissionData
 from app.services import permission_service
 
-router = APIRouter()
+router = APIRouter(tags=['Permissions'])
 
 
 def _query(page, limit, module, search, sort, order):
