@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.router import api_router
-from app.config import FRONTEND_URL, UPLOAD_DIR
+from app.config import FRONTEND_URLS, UPLOAD_DIR
 from app.core.errors import AppError
 from app.core.rate_limit import check_rate_limit
 from app.database import init_db
@@ -56,7 +56,7 @@ def create_app():
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[FRONTEND_URL],
+        allow_origins=FRONTEND_URLS,
         allow_credentials=True,
         allow_methods=['*'],
         allow_headers=['*'],

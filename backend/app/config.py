@@ -55,7 +55,10 @@ JWT_REFRESH_EXPIRES_S = _parse_expiry(JWT_REFRESH_EXPIRES_IN)
 SUPER_ADMIN_EMAIL = os.environ.get('SUPER_ADMIN_EMAIL')
 SUPER_ADMIN_PASSWORD = os.environ.get('SUPER_ADMIN_PASSWORD')
 
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', '')
+FRONTEND_URLS = [u.strip() for u in FRONTEND_URL.split(',') if u.strip()]
+if not FRONTEND_URLS:
+    FRONTEND_URLS = ['http://localhost:3000', 'https://blog-role.vercel.app']
 
 UPLOAD_DIR = os.environ.get('UPLOAD_DIR', '/tmp/uploads' if IS_SERVERLESS else 'uploads')
 MAX_UPLOAD_SIZE_MB = int(os.environ.get('MAX_UPLOAD_SIZE_MB', '10'))
