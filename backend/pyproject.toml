@@ -1,0 +1,20 @@
+[project]
+name = "blog-backend"
+version = "1.0.0"
+description = "FastAPI backend for the blog application"
+requires-python = ">=3.12"
+dependencies = [
+    "bleach>=4.0,<5.0",
+    "bcrypt>=4.1,<5",
+    "email-validator>=1.1,<1.2",
+    "fastapi>=0.78,<0.84",
+    "PyJWT>=2.0,<2.5",
+    "pydantic>=1.10.13,<2",
+    "python-dateutil>=2.8",
+    "python-multipart>=0.0.5,<0.0.6",
+    "SQLAlchemy>=1.4.0,<2.0.0",
+    "uvicorn>=0.13,<0.16",
+]
+
+[tool.uv]
+package = false
