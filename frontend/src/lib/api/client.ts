@@ -1,7 +1,6 @@
 import { getAccessToken } from '@/lib/auth/tokens';
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || 'https://backend-coral-delta-60.vercel.app/api/v1';
+const API_BASE = 'https://backend-coral-delta-60.vercel.app/api/v1';
 
 export function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
